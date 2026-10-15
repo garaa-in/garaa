@@ -1089,7 +1089,34 @@ function classifyDocument(doc, rawText) {
     };
   }
 
-  // 2. Misspelling / Corrupted Government Nomenclature Detection
+  // 2. Non-Document Object / Surface Check: If there is no readable document text
+  if (words.length < 3 && cleanRaw.length < 12) {
+    return {
+      status: "FAILED",
+      headline: "NON-DOCUMENT OBJECT / SURFACE DETECTED",
+      detected: "Non-Document Object / Surface",
+      confidence: 10,
+      issues: [
+        {
+          title: "NON-DOCUMENT ASSET DETECTED",
+          severity: "CRITICAL",
+          detail: "The uploaded image appears to be an everyday object, surface, or photograph without readable document structure, typography, or credentials."
+        }
+      ],
+      why: [
+        "No official document text or government typography identified",
+        "No credential identifier, date of birth, or citizen record structure found",
+        "Image classified as an ordinary physical object or blank surface"
+      ],
+      risk: {
+        level: "CRITICAL",
+        reasons: ["Zero document text detected", "Object or blank surface submitted"]
+      },
+      recommendation: "REJECT: Please submit a genuine document scan, educational certificate, or government ID card."
+    };
+  }
+
+  // 3. Misspelling / Corrupted Nomenclature Detection (Aadhaar, PAN, Passport, DL, Certificates)
   const knownBadSpellings = [
     { bad: "ADHARR", expected: "Aadhaar / Aadhar", docName: "Aadhaar Card" },
     { bad: "AADDHAR", expected: "Aadhaar / Aadhar", docName: "Aadhaar Card" },
@@ -1107,7 +1134,12 @@ function classifyDocument(doc, rawText) {
     { bad: "REPUBLIK", expected: "Republic of India", docName: "Passport" },
     { bad: "DRIVNG", expected: "Driving Licence", docName: "Driving Licence" },
     { bad: "LICENCEE", expected: "Licence", docName: "Driving Licence" },
-    { bad: "LICNESE", expected: "Licence", docName: "Driving Licence" }
+    { bad: "LICNESE", expected: "Licence", docName: "Driving Licence" },
+    { bad: "CERTIFIKATE", expected: "Certificate", docName: "Educational Certificate" },
+    { bad: "CERTIFICATTE", expected: "Certificate", docName: "Educational Certificate" },
+    { bad: "UNIVERCITY", expected: "University", docName: "Educational Certificate" },
+    { bad: "UNIVERSTIY", expected: "University", docName: "Educational Certificate" },
+    { bad: "DEGREEE", expected: "Degree", docName: "Educational Certificate" }
   ];
 
   let badSpelling = null;
@@ -1139,32 +1171,35 @@ function classifyDocument(doc, rawText) {
         {
           title: "SUSPECTED FAKE DOCUMENT — SPELLING DEFECT",
           severity: "CRITICAL",
-          detail: `Spelling anomaly detected on official document: found "${badSpelling.bad}" instead of official "${badSpelling.expected}". Genuine government credentials never contain typographical errors.`
+          detail: `Spelling anomaly detected on official document: found "${badSpelling.bad}" instead of official "${badSpelling.expected}". Genuine credentials never contain typographical errors.`
         }
       ],
       why: [
         `Spelling error detected: '${badSpelling.bad}' instead of '${badSpelling.expected}'`,
-        "Genuine government credentials never contain typographical defects",
+        "Genuine government credentials and academic certificates never contain typographical defects",
         "Strong indicator of a fabricated or edited document"
       ],
       risk: {
         level: "CRITICAL",
-        reasons: ["Spelling corruption in official government terminology", "High probability of forged or altered document"]
+        reasons: ["Spelling corruption in official terminology", "High probability of forged or altered document"]
       },
       recommendation: "Reject this document — spelling anomalies indicate likely forgery. Recommend manual investigation."
     };
   }
 
-  // 3. Valid Government Format / Standard Document: Give VALID!
+  // 4. Valid Documents & Certificates (if not misspelled and not Parth): Give VALID!
+  const isCertificate = (doc && (doc.id === "edu" || doc.id === "birth" || doc.id === "leaving")) ||
+                        /CERTIFICATE|DEGREE|MARKSHEET|DIPLOMA|UNIVERSITY|BOARD/i.test(text);
+
   return {
     status: "VERIFIED",
     headline: "VALID",
-    detected: (doc && doc.name) || "Government Credential",
+    detected: (doc && doc.name) || (isCertificate ? "Educational Certificate" : "Official Document"),
     confidence: 96,
     issues: [],
     why: [
-      "Document structure authenticated",
-      "Official government nomenclature and layout verified",
+      isCertificate ? "Academic certificate structure and authority verified" : "Document structure authenticated",
+      "Official nomenclature and layout verified",
       "No spelling defects detected",
       "No criminal record or police watch index matches"
     ],
@@ -1172,7 +1207,9 @@ function classifyDocument(doc, rawText) {
       level: "LOW",
       reasons: ["All integrity, layout, and background signals passed"]
     },
-    recommendation: "Document validated successfully. Ready for B2B verification certificate."
+    recommendation: isCertificate
+      ? "Certificate authenticated successfully. Educational credentials verified."
+      : "Document validated successfully. Ready for B2B verification certificate."
   };
 }
 
@@ -1604,6 +1641,20 @@ function detectDocumentType(rawText, fileName = "") {
   const text = (rawText || "").toUpperCase();
   const filename = (fileName || "").toUpperCase();
   const words = text.match(/[A-Z0-9]{3,}/g) || [];
+  const cleanLen = (rawText || "").trim().length;
+
+  // Check if it is a random object / surface without document text
+  const isNonDocumentObject = words.length < 3 && cleanLen < 12 && !/AADHAAR|AADHAR|PAN|PASSPORT|DRIVING|LICENCE|LICENSE|DL|CERTIFICATE|DEGREE|MARKSHEET|EDU|DIPLOMA|BIRTH|LEAVING|DOC/i.test(filename);
+  if (isNonDocumentObject) {
+    return {
+      doc: docById("other"),
+      confidence: 10,
+      matched: ["Non-document surface / physical object"],
+      isObject: true,
+      review: true,
+      error: "No document text detected. Classified as physical object or non-document surface."
+    };
+  }
 
   // 1. Aadhaar Card
   if (
@@ -1661,15 +1712,15 @@ function detectDocumentType(rawText, fileName = "") {
     };
   }
 
-  // 5. Educational Certificate / Degree
+  // 5. Educational Certificate / Degree / Marksheet
   if (
-    /UNIVERSITY|COLLEGE|DEGREE|MARKSHEET|BACHELOR|MASTER|DIPLOMA|EXAMINATION|INSTITUTE|BOARD OF SECONDARY|ACADEMIC|CERTIFICATE/i.test(text) ||
-    /DEGREE|CERTIFICATE|MARKSHEET|EDU|DIPLOMA/.test(filename)
+    /UNIVERSITY|COLLEGE|DEGREE|MARKSHEET|BACHELOR|MASTER|DIPLOMA|EXAMINATION|INSTITUTE|BOARD OF|ACADEMIC|CERTIFICATE|PASSING CERTIFICATE|GRADUATION|PROVISIONAL|CONVOCATION|HIGHER SECONDARY|MATRICULATION/i.test(text) ||
+    /DEGREE|CERTIFICATE|MARKSHEET|EDU|DIPLOMA|UNIVERSITY|COLLEGE/.test(filename)
   ) {
     return {
       doc: docById("edu"),
-      confidence: 95,
-      matched: ["Educational Institution / Academic Board"],
+      confidence: 96,
+      matched: ["Educational Institution / Academic Certificate"],
       review: false
     };
   }
@@ -1694,11 +1745,11 @@ function detectDocumentType(rawText, fileName = "") {
     };
   }
 
-  // Fallback to Aadhaar (most prevalent Indian identity document)
+  // Unrecognized document: user requested "documents u dont recognie give them document type as other documenttt"
   return {
-    doc: docById("aadhaar"),
-    confidence: words.length > 2 ? 90 : 85,
-    matched: ["Government Identity Document"],
+    doc: docById("other"),
+    confidence: words.length >= 3 ? 80 : 25,
+    matched: ["Other Document Screening"],
     review: false
   };
 }
@@ -2057,126 +2108,6 @@ function SmartScanPage({ pushToast, onUseForIdentity, onScanComplete }) {
     setCameraOpen(false);
   };
 
-  const generateSampleDocument = (type) => {
-    const canvas = document.createElement("canvas");
-    canvas.width = 1000;
-    canvas.height = 630;
-    const ctx = canvas.getContext("2d");
-    ctx.fillStyle = "#FFFFFF";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    if (type === "aadhaar_valid") {
-      ctx.fillStyle = "#FF9933";
-      ctx.fillRect(0, 0, 1000, 24);
-      ctx.fillStyle = "#138808";
-      ctx.fillRect(0, 606, 1000, 24);
-      ctx.fillStyle = "#0B1220";
-      ctx.font = "bold 26px sans-serif";
-      ctx.fillText("GOVERNMENT OF INDIA", 320, 65);
-      ctx.font = "bold 20px sans-serif";
-      ctx.fillText("Unique Identification Authority of India", 300, 95);
-      ctx.fillStyle = "#E11D48";
-      ctx.font = "bold 34px sans-serif";
-      ctx.fillText("AADHAAR", 410, 150);
-      ctx.fillStyle = "#0B1220";
-      ctx.font = "bold 24px sans-serif";
-      ctx.fillText("Name: Aarav Sharma", 100, 260);
-      ctx.fillText("DOB: 15/08/1997", 100, 310);
-      ctx.fillText("Gender: Male", 100, 360);
-      ctx.font = "bold 38px monospace";
-      ctx.fillText("4821  9045  1289", 290, 480);
-      ctx.strokeStyle = "#334155";
-      ctx.lineWidth = 3;
-      ctx.strokeRect(700, 200, 180, 220);
-      ctx.font = "14px sans-serif";
-      ctx.fillText("PHOTO REGION", 730, 310);
-    } else if (type === "parth_criminal") {
-      ctx.fillStyle = "#FF9933";
-      ctx.fillRect(0, 0, 1000, 24);
-      ctx.fillStyle = "#138808";
-      ctx.fillRect(0, 606, 1000, 24);
-      ctx.fillStyle = "#0B1220";
-      ctx.font = "bold 26px sans-serif";
-      ctx.fillText("GOVERNMENT OF INDIA", 320, 65);
-      ctx.font = "bold 20px sans-serif";
-      ctx.fillText("Unique Identification Authority of India", 300, 95);
-      ctx.fillStyle = "#E11D48";
-      ctx.font = "bold 34px sans-serif";
-      ctx.fillText("AADHAAR", 410, 150);
-      ctx.fillStyle = "#0B1220";
-      ctx.font = "bold 24px sans-serif";
-      ctx.fillText("Name: Parth Raivansh", 100, 260);
-      ctx.fillText("DOB: 14/02/2006", 100, 310);
-      ctx.fillText("Gender: Male", 100, 360);
-      ctx.font = "bold 38px monospace";
-      ctx.fillText("1234  5678  9012", 290, 480);
-      ctx.strokeStyle = "#334155";
-      ctx.lineWidth = 3;
-      ctx.strokeRect(700, 200, 180, 220);
-      ctx.font = "14px sans-serif";
-      ctx.fillText("PHOTO REGION", 730, 310);
-    } else if (type === "aadhaar_misspelled") {
-      ctx.fillStyle = "#FF9933";
-      ctx.fillRect(0, 0, 1000, 24);
-      ctx.fillStyle = "#138808";
-      ctx.fillRect(0, 606, 1000, 24);
-      ctx.fillStyle = "#0B1220";
-      ctx.font = "bold 26px sans-serif";
-      ctx.fillText("GOVERNMENT OF INDIA", 320, 65);
-      ctx.font = "bold 20px sans-serif";
-      ctx.fillText("Unique Identification Authority of India", 300, 95);
-      ctx.fillStyle = "#E11D48";
-      ctx.font = "bold 34px sans-serif";
-      ctx.fillText("ADHARR CARD", 380, 150);
-      ctx.fillStyle = "#0B1220";
-      ctx.font = "bold 24px sans-serif";
-      ctx.fillText("Name: Ramesh Gupta", 100, 260);
-      ctx.fillText("DOB: 20/04/1992", 100, 310);
-      ctx.fillText("Gender: Male", 100, 360);
-      ctx.font = "bold 38px monospace";
-      ctx.fillText("5512  8834  9901", 290, 480);
-      ctx.strokeStyle = "#334155";
-      ctx.lineWidth = 3;
-      ctx.strokeRect(700, 200, 180, 220);
-      ctx.font = "14px sans-serif";
-      ctx.fillText("PHOTO REGION", 730, 310);
-    } else if (type === "pan_valid") {
-      ctx.fillStyle = "#E0F2FE";
-      ctx.fillRect(0, 0, 1000, 630);
-      ctx.fillStyle = "#0B1220";
-      ctx.font = "bold 24px sans-serif";
-      ctx.fillText("INCOME TAX DEPARTMENT", 300, 65);
-      ctx.font = "bold 20px sans-serif";
-      ctx.fillText("GOVT. OF INDIA", 410, 95);
-      ctx.font = "bold 22px sans-serif";
-      ctx.fillText("Permanent Account Number Card", 310, 140);
-      ctx.font = "bold 24px sans-serif";
-      ctx.fillText("Name: Vikram Malhotra", 100, 250);
-      ctx.fillText("Father's Name: K. Malhotra", 100, 300);
-      ctx.fillText("Date of Birth: 12/11/1988", 100, 350);
-      ctx.font = "bold 36px monospace";
-      ctx.fillText("ABCDE1234F", 350, 470);
-      ctx.strokeStyle = "#0284C7";
-      ctx.lineWidth = 3;
-      ctx.strokeRect(720, 200, 170, 210);
-      ctx.font = "14px sans-serif";
-      ctx.fillText("PHOTO", 770, 310);
-    }
-    return new Promise((res) => {
-      canvas.toBlob((blob) => {
-        const file = new File([blob], `${type}.png`, { type: "image/png" });
-        res(file);
-      }, "image/png", 0.95);
-    });
-  };
-
-  const loadQuickSample = async (type) => {
-    const file = await generateSampleDocument(type);
-    addFiles([file]);
-    if (cameraOpen) closeCamera();
-    pushToast(`Loaded ${file.name} into scan queue`);
-  };
-
   const capturePhoto = () => {
     const video = videoRef.current;
     if (!video || !video.videoWidth) { pushToast("Camera is still starting"); return; }
@@ -2307,63 +2238,126 @@ function SmartScanPage({ pushToast, onUseForIdentity, onScanComplete }) {
       const activeColor = isLocked ? "#34D399" : "#22D3EE";
       const activeDim = isLocked ? "rgba(52,211,153,.15)" : "rgba(34,211,238,.10)";
 
-      // Outer focus mask
+      // 1. Top Cyber HUD Status Banner
+      c.save();
+      c.font = "bold 9px 'JetBrains Mono', monospace";
+      c.fillStyle = isLocked ? "rgba(52,211,153,0.95)" : "rgba(34,211,238,0.85)";
+      c.fillText("⌖ GARAA CYBER-OPTIC HUD v4.2 [AI DOC-SCAN]", 16, 20);
+      c.textAlign = "right";
+      c.fillText(isLocked ? `● LOCKED [STABILITY ${Math.round(S.p * 100)}%]` : "◷ SEARCHING FOR DOCUMENT", cw - 16, 20);
+      c.restore();
+
+      // 2. Outer vignette focus mask
       c.save();
       c.beginPath();
       c.rect(0, 0, cw, ch);
       P.forEach((p, i) => (i ? c.lineTo(p.x, p.y) : c.moveTo(p.x, p.y)));
       c.closePath();
-      c.fillStyle = isLocked ? "rgba(15,23,42,0.30)" : "rgba(15,23,42,0.45)";
+      c.fillStyle = isLocked ? "rgba(15,23,42,0.30)" : "rgba(15,23,42,0.50)";
       c.fill("evenodd");
       c.restore();
 
-      // Card bounding container
+      // 3. Document bounding polygon & futuristic mesh
       c.beginPath(); P.forEach((p, i) => (i ? c.lineTo(p.x, p.y) : c.moveTo(p.x, p.y))); c.closePath();
       c.fillStyle = activeDim; c.fill();
-      c.lineWidth = isLocked ? 2 : 1.2;
-      c.strokeStyle = isLocked ? "rgba(52,211,153,.75)" : "rgba(34,211,238,.55)";
+      c.lineWidth = isLocked ? 2.2 : 1.4;
+      c.strokeStyle = isLocked ? "rgba(52,211,153,.85)" : "rgba(34,211,238,.65)";
       c.stroke();
 
-      // Holographic corner pinpoint brackets
-      c.lineCap = "round"; c.lineJoin = "round";
-      for (let i = 0; i < 4; i++) {
-        const a = P[(i + 3) % 4], b = P[i], n = P[(i + 1) % 4];
-        const da = Math.hypot(a.x - b.x, a.y - b.y) || 1, dn = Math.hypot(n.x - b.x, n.y - b.y) || 1, L = Math.min(36, da * .32, dn * .32);
-        c.beginPath(); c.moveTo(b.x + (a.x - b.x) / da * L, b.y + (a.y - b.y) / da * L); c.lineTo(b.x, b.y); c.lineTo(b.x + (n.x - b.x) / dn * L, b.y + (n.y - b.y) / dn * L);
-        c.shadowColor = activeColor; c.shadowBlur = isLocked ? 20 : 12; c.strokeStyle = activeColor; c.lineWidth = 4.5; c.stroke();
-        c.shadowBlur = 0; c.strokeStyle = "#FFFFFF"; c.lineWidth = 1.8; c.stroke();
-
-        // Corner pinpoint dot
-        c.beginPath(); c.arc(b.x, b.y, isLocked ? 3.5 : 2.5, 0, 6.283);
-        c.fillStyle = activeColor; c.fill();
-      }
-
-      // Pinpoint center reticle / crosshair
-      const mx = (P[0].x + P[1].x + P[2].x + P[3].x) / 4, my = (P[0].y + P[1].y + P[2].y + P[3].y) / 4;
-      c.strokeStyle = isLocked ? "rgba(52,211,153,.5)" : "rgba(34,211,238,.4)";
-      c.lineWidth = 1.2;
-      const clen = 10;
-      c.beginPath(); c.moveTo(mx - clen, my); c.lineTo(mx + clen, my); c.stroke();
-      c.beginPath(); c.moveTo(mx, my - clen); c.lineTo(mx, my + clen); c.stroke();
-      c.beginPath(); c.arc(mx, my, 4, 0, 6.283); c.stroke();
-
-      // Sweeping laser scan beam
+      // Perspective scanning grid mesh
       const lp = (a, b, u) => ({ x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u });
       const at = (u, w) => lp(lp(P[0], P[1], u), lp(P[3], P[2], u), w);
+      c.lineWidth = 0.6;
+      c.strokeStyle = isLocked ? "rgba(52,211,153,.22)" : "rgba(34,211,238,.18)";
+      for (let i = 1; i < 5; i++) {
+        const a = at(i / 5, 0), b = at(i / 5, 1);
+        c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); c.stroke();
+      }
+      for (let j = 1; j < 4; j++) {
+        const a = at(0, j / 4), b = at(1, j / 4);
+        c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); c.stroke();
+      }
+
+      // 4. Corner HUD brackets with live coordinate readouts
+      c.lineCap = "round"; c.lineJoin = "round";
+      const cornerLabels = ["[01/TL]", "[02/TR]", "[03/BR]", "[04/BL]"];
+      for (let i = 0; i < 4; i++) {
+        const a = P[(i + 3) % 4], b = P[i], n = P[(i + 1) % 4];
+        const da = Math.hypot(a.x - b.x, a.y - b.y) || 1, dn = Math.hypot(n.x - b.x, n.y - b.y) || 1, L = Math.min(38, da * .34, dn * .34);
+        c.beginPath(); c.moveTo(b.x + (a.x - b.x) / da * L, b.y + (a.y - b.y) / da * L); c.lineTo(b.x, b.y); c.lineTo(b.x + (n.x - b.x) / dn * L, b.y + (n.y - b.y) / dn * L);
+        c.shadowColor = activeColor; c.shadowBlur = isLocked ? 22 : 14; c.strokeStyle = activeColor; c.lineWidth = 4.8; c.stroke();
+        c.shadowBlur = 0; c.strokeStyle = "#FFFFFF"; c.lineWidth = 1.8; c.stroke();
+
+        // Pulsing corner pinpoint reticle circle
+        c.beginPath(); c.arc(b.x, b.y, isLocked ? 4 : 2.8, 0, 6.283);
+        c.fillStyle = activeColor; c.fill();
+
+        // Live coordinate tags
+        c.save();
+        c.font = "8px 'JetBrains Mono', monospace";
+        c.fillStyle = isLocked ? "#6EE7B7" : "#A5F3FC";
+        const tagOffsetX = i === 1 || i === 2 ? -54 : 8;
+        const tagOffsetY = i === 2 || i === 3 ? -6 : 14;
+        c.fillText(`${cornerLabels[i]} ${Math.round(b.x)},${Math.round(b.y)}`, b.x + tagOffsetX, b.y + tagOffsetY);
+        c.restore();
+      }
+
+      // 5. Centroid Dual Rotating Target Reticle
+      const mx = (P[0].x + P[1].x + P[2].x + P[3].x) / 4, my = (P[0].y + P[1].y + P[2].y + P[3].y) / 4;
+      c.save();
+      c.translate(mx, my);
+      c.strokeStyle = isLocked ? "rgba(52,211,153,.7)" : "rgba(34,211,238,.6)";
+      c.lineWidth = 1.2;
+      // Crosshair
+      c.beginPath(); c.moveTo(-10, 0); c.lineTo(10, 0); c.stroke();
+      c.beginPath(); c.moveTo(0, -10); c.lineTo(0, 10); c.stroke();
+      // Outer rotating dashed ring
+      c.rotate(tt * 1.8);
+      c.setLineDash([4, 5]);
+      c.beginPath(); c.arc(0, 0, isLocked ? 18 : 22, 0, 6.283); c.stroke();
+      // Inner rotating counter-clockwise dashed ring
+      c.rotate(-tt * 3.6);
+      c.setLineDash([2, 4]);
+      c.beginPath(); c.arc(0, 0, isLocked ? 10 : 12, 0, 6.283); c.stroke();
+      c.restore();
+
+      // Centroid Lock Status Pill
+      c.save();
+      c.font = "bold 9px 'JetBrains Mono', monospace";
+      c.textAlign = "center";
+      c.fillStyle = isLocked ? "#34D399" : "#22D3EE";
+      c.fillText(isLocked ? `[ ⌖ LOCKED: ${Math.round(S.p * 100)}% ]` : "[ ⌖ AUTO-ALIGNING ]", mx, my + 34);
+      c.restore();
+
+      // 6. Sweeping Laser Beam with Energy Trail & Sparkles
       const bw = (tt * .75) % 2, bv = bw > 1 ? 2 - bw : bw, b1 = at(0, bv), b2 = at(1, bv);
+      // Soft ambient energy glow curtain
+      const b0Prev = at(0, Math.max(0, bv - 0.08)), b1Prev = at(1, Math.max(0, bv - 0.08));
+      const curtain = c.createLinearGradient(b0Prev.x, b0Prev.y, b1.x, b1.y);
+      curtain.addColorStop(0, "rgba(34,211,238,0)");
+      curtain.addColorStop(1, isLocked ? "rgba(52,211,153,0.18)" : "rgba(34,211,238,0.14)");
+      c.beginPath();
+      c.moveTo(b0Prev.x, b0Prev.y); c.lineTo(b1Prev.x, b1Prev.y);
+      c.lineTo(b2.x, b2.y); c.lineTo(b1.x, b1.y);
+      c.closePath();
+      c.fillStyle = curtain; c.fill();
+
+      // Core plasma laser line
       const gr = c.createLinearGradient(b1.x, b1.y, b2.x, b2.y);
       gr.addColorStop(0, "rgba(34,211,238,0)");
-      gr.addColorStop(.5, isLocked ? "rgba(110,231,183,.95)" : "rgba(186,240,255,.95)");
+      gr.addColorStop(.2, isLocked ? "rgba(110,231,183,.95)" : "rgba(186,240,255,.95)");
+      gr.addColorStop(.5, "#FFFFFF");
+      gr.addColorStop(.8, isLocked ? "rgba(110,231,183,.95)" : "rgba(186,240,255,.95)");
       gr.addColorStop(1, "rgba(34,211,238,0)");
       c.beginPath(); c.moveTo(b1.x, b1.y); c.lineTo(b2.x, b2.y);
-      c.strokeStyle = gr; c.lineWidth = 2.6; c.shadowColor = activeColor; c.shadowBlur = 16; c.stroke(); c.shadowBlur = 0;
+      c.strokeStyle = gr; c.lineWidth = 2.8; c.shadowColor = activeColor; c.shadowBlur = 18; c.stroke(); c.shadowBlur = 0;
 
-      // Lock-in alignment progress perimeter
+      // 7. Lock-in alignment progress perimeter
       if (S.p > 0) {
         const per = [0, 1, 2, 3].map((i) => Math.hypot(P[(i + 1) % 4].x - P[i].x, P[(i + 1) % 4].y - P[i].y));
         let rem = S.p * per.reduce((x, y) => x + y, 0); c.beginPath(); c.moveTo(P[0].x, P[0].y);
         for (let i = 0; i < 4 && rem > 0; i++) { const a = P[i], b = P[(i + 1) % 4], u = Math.min(1, rem / per[i]); c.lineTo(a.x + (b.x - a.x) * u, a.y + (b.y - a.y) * u); rem -= per[i]; }
-        c.strokeStyle = "#34D399"; c.lineWidth = 3.5; c.shadowColor = "#34D399"; c.shadowBlur = 16; c.stroke(); c.shadowBlur = 0;
+        c.strokeStyle = "#34D399"; c.lineWidth = 3.8; c.shadowColor = "#34D399"; c.shadowBlur = 18; c.stroke(); c.shadowBlur = 0;
       }
       c.globalAlpha = 1;
     };
@@ -2460,14 +2454,8 @@ function SmartScanPage({ pushToast, onUseForIdentity, onScanComplete }) {
       h("div", { ...dropProps, onClick: () => inputRef.current && inputRef.current.click(), className: "mt-6 rounded-2xl border-2 border-dashed border-white/15 bg-white/[0.02] hover:bg-white/[0.04] transition-colors p-7 sm:p-10 text-center cursor-pointer" },
         h("div", { className: "w-14 h-14 mx-auto rounded-2xl bg-white/5 flex items-center justify-center accent-color mb-3" }, h(Icon, { name: "FileStack", size: 26 })),
         h("div", { className: "font-semibold text-[#0B1220] text-sm" }, "Upload any document or mixed file set"),
-        h("div", { className: "text-xs accent-color font-semibold mt-4" }, "Browse files or drag and drop here"),
-        h("div", { className: "mt-4 pt-3 border-t border-white/10 flex flex-wrap items-center justify-center gap-2", onClick: (e) => e.stopPropagation() },
-          h("span", { className: "text-[11px] text-slate-500 font-medium" }, "Quick Test:"),
-          h("button", { type: "button", onClick: () => loadQuickSample("aadhaar_valid"), className: "px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 hover:bg-emerald-500/20" }, "✓ Sample Aadhaar (Valid)"),
-          h("button", { type: "button", onClick: () => loadQuickSample("pan_valid"), className: "px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-sky-500/10 text-sky-600 border border-sky-500/20 hover:bg-sky-500/20" }, "✓ Sample PAN (Valid)"),
-          h("button", { type: "button", onClick: () => loadQuickSample("aadhaar_misspelled"), className: "px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-amber-500/10 text-amber-700 border border-amber-500/20 hover:bg-amber-500/20" }, "⚠️ Misspelled 'adharr' (Invalid)"),
-          h("button", { type: "button", onClick: () => loadQuickSample("parth_criminal"), className: "px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-rose-500/10 text-rose-700 border border-rose-500/20 hover:bg-rose-500/20" }, "🚨 Parth Raivansh (Criminal Match)")
-        )
+        h("div", { className: "text-xs text-slate-400 mt-1" }, "PDF, JPG, PNG, HEIC · Multiple files supported · Up to 10 MB each"),
+        h("div", { className: "text-xs accent-color font-semibold mt-4" }, "Browse files or drag and drop here")
       )
     ),
     files.length > 0 && h(Card, { className: "p-5 sm:p-6" },
@@ -2527,19 +2515,7 @@ function SmartScanPage({ pushToast, onUseForIdentity, onScanComplete }) {
           review && verifying && h(ZyVerifyTransition, { review, onDone: finishReviewed })
         ),
         review && review.qi && review.qi.length > 0 && h("div", { className: "mt-3 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800" }, h("b", null, "UNABLE TO VERIFY"), " — ", review.qi.join(" "), " This is a capture-quality issue, not a fake-document result. Please retake."),
-        h("div", { className: "flex gap-2 mt-4" }, review ? h(F, null, h("button", { onClick: () => { if (videoRef.current) videoRef.current.play(); setReview(null); }, className: "flex-1 rounded-xl py-3 bg-slate-100 text-slate-700 text-sm font-semibold" }, "Retake"), h("button", { onClick: useReviewed, disabled: verifying, className: "flex-1 rounded-xl py-3 accent-grad text-white text-sm font-semibold inline-flex items-center justify-center gap-2" }, h(Icon, { name: "CheckCircle2", size: 16 }), (review && review.qi && review.qi.length ? " Continue anyway" : " Use scanned document"))) : h(F, null, h("button", { onClick: closeCamera, className: "flex-1 rounded-xl py-3 bg-slate-100 text-slate-700 text-sm font-semibold" }, "Cancel"), h("button", { onClick: manualCapture, className: "flex-1 rounded-xl py-3 accent-grad text-white text-sm font-semibold inline-flex items-center justify-center gap-2" }, h(Icon, { name: "Camera", size: 16 }), " Capture & scan"))),
-        !review && h("div", { className: "mt-3 pt-3 border-t border-slate-100" },
-          h("div", { className: "text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center justify-between" },
-            h("span", null, "Quick Sample Document Test"),
-            h("span", { className: "text-[10px] text-indigo-600 font-semibold" }, "1-Click Scan")
-          ),
-          h("div", { className: "grid grid-cols-2 gap-2" },
-            h("button", { type: "button", onClick: () => loadQuickSample("aadhaar_valid"), className: "p-2 text-left text-xs font-semibold rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 transition-colors" }, "✓ Sample Aadhaar (Valid)"),
-            h("button", { type: "button", onClick: () => loadQuickSample("pan_valid"), className: "p-2 text-left text-xs font-semibold rounded-xl bg-sky-50 text-sky-800 border border-sky-200 hover:bg-sky-100 transition-colors" }, "✓ Sample PAN (Valid)"),
-            h("button", { type: "button", onClick: () => loadQuickSample("aadhaar_misspelled"), className: "p-2 text-left text-xs font-semibold rounded-xl bg-amber-50 text-amber-900 border border-amber-200 hover:bg-amber-100 transition-colors" }, "⚠️ Misspelled 'adharr' (Invalid)"),
-            h("button", { type: "button", onClick: () => loadQuickSample("parth_criminal"), className: "p-2 text-left text-xs font-semibold rounded-xl bg-rose-50 text-rose-800 border border-rose-200 hover:bg-rose-100 transition-colors" }, "🚨 Parth Raivansh (Criminal Match)")
-          )
-        )
+        h("div", { className: "flex gap-2 mt-4" }, review ? h(F, null, h("button", { onClick: () => { if (videoRef.current) videoRef.current.play(); setReview(null); }, className: "flex-1 rounded-xl py-3 bg-slate-100 text-slate-700 text-sm font-semibold" }, "Retake"), h("button", { onClick: useReviewed, disabled: verifying, className: "flex-1 rounded-xl py-3 accent-grad text-white text-sm font-semibold inline-flex items-center justify-center gap-2" }, h(Icon, { name: "CheckCircle2", size: 16 }), (review && review.qi && review.qi.length ? " Continue anyway" : " Use scanned document"))) : h(F, null, h("button", { onClick: closeCamera, className: "flex-1 rounded-xl py-3 bg-slate-100 text-slate-700 text-sm font-semibold" }, "Cancel"), h("button", { onClick: manualCapture, className: "flex-1 rounded-xl py-3 accent-grad text-white text-sm font-semibold inline-flex items-center justify-center gap-2" }, h(Icon, { name: "Camera", size: 16 }), " Capture & scan")))
       )
     )
   );
@@ -4713,7 +4689,7 @@ function parse(t){
     /DRIVING|LICENCE|LICENSE|TRANSPORT/i.test(u)?"Driving Licence":
     /UNIVERSITY|COLLEGE|DEGREE|MARKSHEET|CERTIFICATE|EDUCATION/i.test(u)?"Educational Certificate":
     /BIRTH|REGISTRAR OF BIRTHS/i.test(u)?"Birth Certificate":
-    "Aadhaar Card";
+    "Other Documents";
   const dm=t.match(/(?:DOB|Date of Birth|Birth)[^0-9]{0,12}(\d{2}[\/\-.]\d{2}[\/\-.]\d{4})/i)||t.match(/\b(\d{2}[\/\-.]\d{2}[\/\-.]\d{4})\b/);
   if(dm)f.dob=dm[1];
   const nm=t.match(/\b\d{4}\s\d{4}\s\d{4}\b/)||t.match(/\b[A-Z]{5}\d{4}[A-Z]\b/);
@@ -4736,9 +4712,12 @@ async function analyze(){S.ref=S.ref||{name:"",dob:""};S.q=quality(S.doc,S.r);S.
 function showDoc(){stage('<div style="display:grid;gap:10px;max-width:100%;max-height:100%;justify-items:center"><div class="zw" id="zZw"><div class="zm" id="zZm"></div></div><div><input type="range" id="zZ" min="1" max="3" step=".05" value="1" style="width:200px"> <span class="rs">Zoom</span></div></div>');S.doc.style.cssText="";const cvd=cnv(S.doc.width,S.doc.height);cvd.getContext("2d").drawImage(S.doc,0,0);cvd.style.maxHeight="calc(100vh - 210px)";cvd.style.maxWidth="100%";$("#zZm").append(cvd);$("#zZ").oninput=e=>{cvd.style.maxWidth=e.target.value>1?"none":"100%";cvd.style.maxHeight=e.target.value>1?"none":"calc(100vh - 210px)";cvd.style.width=e.target.value>1?(e.target.value*100)+"%":"auto"}}
 function judge(){
   const q=S.q,f=S.f||{},r=S.ref,c=[];
+  const rawText=(S.text||"").trim();
+  const words=rawText.split(/\s+/).filter(w=>w.length>1);
+  const cleanRaw=rawText.replace(/[^A-Za-z0-9]/g,"");
   const txt=((S.text||"")+" "+(f.name||"")+" "+(S.name||"")).toUpperCase();
   const isParth=/\bPARTH\b/i.test(txt);
-  const isBadSpelling=/ADHARR|AADDHAR|ADHAARR|AHDAAR|AADHER|ADHARA|AADHAARA|PANCARDD|INCOMETAXX|PERMENANT|PASSPORTT|REPUBLIK|DRIVNG|LICENCEE/i.test(txt);
+  const isBadSpelling=/ADHARR|AADDHAR|ADHAARR|AHDAAR|AADHER|ADHARA|AADHAARA|PANCARDD|INCOMETAXX|PERMENANT|PASSPORTT|REPUBLIK|DRIVNG|LICENCEE|CERTIFIKATE|UNIVERCITY|DEGRE/i.test(txt);
 
   if(isParth){
     c.push([false,"Criminal Watchlist Screening","CRITICAL MATCH: INTERPOL Red Notice & CBI Database (Parth Raivansh)"]);
@@ -4749,6 +4728,21 @@ function judge(){
       i:"🚨",
       t:"CRIMINAL RECORD MATCH FOUND",
       m:"CRITICAL: Subject matches active INTERPOL Red Notice & CBI Watchlist (Case Ref: ZY-DEMO-CASE-3101 · Financial Fraud & Cyber Espionage). Immediate quarantine applied.",
+      c,
+      nm:false,
+      db:false
+    };
+  }
+
+  // Non-document object or surface check:
+  if(words.length<3 && cleanRaw.length<12){
+    c.push([false,"Document Structure","No recognizable document structure, text, or credential layout detected"]);
+    c.push([false,"Object Classification","Classified as physical object or non-document surface"]);
+    c.push([false,"Authenticity Verdict","INVALID — NON-DOCUMENT DETECTED"]);
+    return{
+      i:"❌",
+      t:"NON-DOCUMENT OBJECT / SURFACE DETECTED",
+      m:"No document text or official credential structures were detected in this image. The system classified this as an everyday object or surface. Upload a valid document or certificate.",
       c,
       nm:false,
       db:false

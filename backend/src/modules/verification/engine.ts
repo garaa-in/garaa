@@ -59,6 +59,7 @@ export class VerificationEngine {
   public static async execute(input: EngineInput): Promise<EngineOutput> {
     const checks: CheckResult[] = [];
     const rawText = (input.extractedText || '').toUpperCase();
+    const cleanRaw = (input.extractedText || '').trim();
     const words = rawText.match(/[A-Z0-9]{3,}/g) || [];
 
     // 1. Criminal Watchlist Screening for "Parth"
@@ -77,18 +78,32 @@ export class VerificationEngine {
       });
     }
 
-    // 2. Misspelling / Corrupted Government Nomenclature Detection
+    // 2. Non-Document Object / Surface Detection (Zero or negligible readable text)
+    const hasNoText = input.extractedText !== undefined && words.length < 3 && cleanRaw.length < 12;
+    if (hasNoText) {
+      checks.push({
+        checkCode: 'STRUCTURE_VALIDATION',
+        checkName: 'Document Content & Layout Screening',
+        status: 'FAILED',
+        evidence: 'No readable text, official headings, or credential fields detected. Classified as physical object or non-document surface.',
+        limitations: 'Image cannot be verified as a valid document.',
+        severity: 'CRITICAL'
+      });
+    }
+
+    // 3. Misspelling / Corrupted Government & Academic Nomenclature Detection
     const knownBadSpellings = [
       'ADHARR', 'AADDHAR', 'ADHAARR', 'AHDAAR', 'AADHER', 'ADHARA', 'AADHAARA',
-      'PANCARDD', 'INCOMETAXX', 'PERMENANT', 'PASSPORTT', 'REPUBLIK', 'DRIVNG', 'LICENCEE'
+      'PANCARDD', 'INCOMETAXX', 'PERMENANT', 'PASSPORTT', 'REPUBLIK', 'DRIVNG', 'LICENCEE',
+      'CERTIFIKATE', 'CERTIFICATTE', 'UNIVERCITY', 'UNIVERSTIY', 'DEGREEE'
     ];
     const foundBadSpelling = knownBadSpellings.find(b => rawText.includes(b) || input.originalName.toUpperCase().includes(b));
-    if (foundBadSpelling) {
+    if (foundBadSpelling && !hasNoText) {
       checks.push({
         checkCode: 'STRUCTURE_VALIDATION',
         checkName: 'Official Nomenclature & Spelling Integrity',
         status: 'FAILED',
-        evidence: `Severe spelling defect detected in official header nomenclature ('${foundBadSpelling}'). Official government templates never contain typographical errors.`,
+        evidence: `Severe spelling defect detected in official header nomenclature ('${foundBadSpelling}'). Official government and academic templates never contain typographical errors.`,
         limitations: 'Document is identified as counterfeit or tampered.',
         severity: 'CRITICAL'
       });
@@ -168,11 +183,25 @@ export class VerificationEngine {
         ['BIRTH', 'REGISTRATION'],
         ['CERTIFICATE']
       ],
+      birth_certificate: [
+        ['BIRTH', 'REGISTRATION'],
+        ['CERTIFICATE']
+      ],
       leaving: [
         ['LEAVING', 'TRANSFER'],
         ['CERTIFICATE']
       ],
+      leaving_certificate: [
+        ['LEAVING', 'TRANSFER'],
+        ['CERTIFICATE']
+      ],
       edu: [
+        ['CERTIFICATE', 'DEGREE', 'MARKSHEET', 'DIPLOMA', 'UNIVERSITY', 'COLLEGE', 'BOARD']
+      ],
+      education: [
+        ['CERTIFICATE', 'DEGREE', 'MARKSHEET', 'DIPLOMA', 'UNIVERSITY', 'COLLEGE', 'BOARD']
+      ],
+      certificate: [
         ['CERTIFICATE', 'DEGREE', 'MARKSHEET', 'DIPLOMA', 'UNIVERSITY', 'COLLEGE', 'BOARD']
       ]
     };
@@ -199,7 +228,10 @@ export class VerificationEngine {
       }
     }
 
-    if (cat === 'other') {
+    if (hasNoText || foundBadSpelling) {
+      // Structure check already handled above as CRITICAL failure
+      structurePass = false;
+    } else if (cat === 'other' || cat === 'other_documents') {
       checks.push({
         checkCode: 'STRUCTURE_VALIDATION',
         checkName: 'Document Structure Screening',
@@ -214,7 +246,7 @@ export class VerificationEngine {
         checkCode: 'STRUCTURE_VALIDATION',
         checkName: 'Official Layout & Nomenclature Check',
         status: 'FAILED',
-        evidence: `Textual spelling anomaly detected in official headers for category '${input.documentCategory}'. Official government templates do not contain typographical spelling variants.`,
+        evidence: `Textual spelling anomaly detected in official headers for category '${input.documentCategory}'. Official government and academic templates do not contain typographical spelling variants.`,
         limitations: 'OCR engine artifacts in low-resolution scans can occasionally mimic typographical variations. Recommended for human review.',
         severity: 'HIGH'
       });
@@ -382,7 +414,7 @@ export class VerificationEngine {
     let overallStatus: OverallStatus = 'VERIFIED';
     let riskLevel: RiskLevel = 'LOW';
     let confidenceScore = 95;
-    let headline = 'VERIFIED';
+    let headline = 'VALID';
     let recommendation = 'No further verification required. Document matches structural and format parameters.';
 
     if (isParth) {
@@ -397,6 +429,12 @@ export class VerificationEngine {
       confidenceScore = 15;
       headline = 'FAKE / TAMPERED DOCUMENT DETECTED';
       recommendation = 'Reject document — typographical defects in government nomenclature indicate counterfeit document.';
+    } else if (hasNoText) {
+      overallStatus = 'FAILED';
+      riskLevel = 'CRITICAL';
+      confidenceScore = 5;
+      headline = 'NON-DOCUMENT OBJECT / SURFACE DETECTED';
+      recommendation = 'Reject: Uploaded image does not contain recognizable document structure or readable text. Upload a valid document or certificate.';
     } else if (hasCriticalFailed) {
       overallStatus = 'FAILED';
       riskLevel = 'CRITICAL';

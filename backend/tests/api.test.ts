@@ -163,6 +163,66 @@ describe('Garaa B2B Platform Comprehensive Test Suite', () => {
     expect(res.body.data.riskLevel).toBe('CRITICAL');
   });
 
+  it('6d. Non-Document Object Rule: Image with no readable text fails as NON-DOCUMENT OBJECT / SURFACE DETECTED', async () => {
+    const res = await request(app)
+      .post('/api/v1/verifications')
+      .set('Authorization', `Bearer ${authTokenOrgA}`)
+      .set('X-Organization-Id', orgAId)
+      .send({
+        documentId: uploadedDocId,
+        subjectName: 'Random Object',
+        documentCategory: 'other',
+        extractedText: ' '
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.status).toBe('FAILED');
+    expect(res.body.data.headline).toBe('NON-DOCUMENT OBJECT / SURFACE DETECTED');
+    expect(res.body.data.riskLevel).toBe('CRITICAL');
+  });
+
+  it('6e. Certificate Rule: Valid educational certificate passes as VERIFIED and VALID', async () => {
+    const res = await request(app)
+      .post('/api/v1/verifications')
+      .set('Authorization', `Bearer ${authTokenOrgA}`)
+      .set('X-Organization-Id', orgAId)
+      .send({
+        documentId: uploadedDocId,
+        subjectName: 'Aditya Sen',
+        subjectDob: '1999-04-12',
+        declaredIdentifier: 'UNI-2023-BTECH-9921',
+        documentCategory: 'edu',
+        extractedText: 'DELHI UNIVERSITY DEGREE CERTIFICATE BACHELOR OF TECHNOLOGY ADITYA SEN FIRST CLASS WITH DISTINCTION'
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.status).toBe('VERIFIED');
+    expect(res.body.data.headline).toBe('VALID');
+    expect(res.body.data.riskLevel).toBe('LOW');
+  });
+
+  it('6f. Misspelled Certificate Rule: Certificate with misspelled university/certificate fails', async () => {
+    const res = await request(app)
+      .post('/api/v1/verifications')
+      .set('Authorization', `Bearer ${authTokenOrgA}`)
+      .set('X-Organization-Id', orgAId)
+      .send({
+        documentId: uploadedDocId,
+        subjectName: 'Kunal Roy',
+        declaredIdentifier: 'CERT-0091',
+        documentCategory: 'edu',
+        extractedText: 'DELHI UNIVERCITY CERTIFIKATE OF COMPLETION KUNAL ROY'
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.status).toBe('FAILED');
+    expect(res.body.data.headline).toBe('FAKE / TAMPERED DOCUMENT DETECTED');
+    expect(res.body.data.riskLevel).toBe('CRITICAL');
+  });
+
   it('7. Journey 6 & 7: Retrieve verification results and full report', async () => {
     const res = await request(app)
       .get(`/api/v1/verifications/${verificationId}`)
