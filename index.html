@@ -5616,10 +5616,10 @@ setInterval(()=>{document.querySelectorAll("button").forEach(b=>{if(b.textConten
 setInterval(()=>{const h=document.querySelector(".zl-hero");if(h&&!h.querySelector(".zx-gfx")){const d=document.createElement("div");d.className="zx-gfx";d.setAttribute("aria-hidden","true");
 d.innerHTML='<i class="zx-rg"></i><i class="zx-rg r2"><b></b></i><div class="zx-chip" style="--dx:-1.45;--dy:-.55;--t:0s"><em>Face match</em><strong>98.6%</strong><u><span style="width:98%"></span></u></div><div class="zx-chip" style="--dx:1.4;--dy:-.15;--t:1.2s"><em>Document</em><strong>Verified \u2713</strong></div><div class="zx-chip" style="--dx:-1.15;--dy:.7;--t:2.1s"><em>Liveness</em><strong>Passed</strong><u><span style="width:92%"></span></u></div>';h.appendChild(d)}},400);
 addEventListener("scroll",()=>{const d=document.querySelector(".zx-gfx");if(d)d.style.opacity=Math.max(0,1-scrollY/(innerHeight*.6))},{passive:true});
- /* ---- REAL 3D NANO-PARTICLE GLOBE TRANSITION ON CREAM WHITE BACKGROUND ---- */
+ /* ---- HD ROTATING REAL EARTH MADE OF JOINED MULTI-COLORED PARTICLES ON CREAM WHITE BACKGROUND ---- */
  function zxScan(swap,end,sourceButton){
   const el=document.createElement("canvas");el.id="zxs";el.setAttribute("aria-hidden","true");
-  const ctx=el.getContext("2d");if(!ctx){setTimeout(swap,1600);setTimeout(end,2950);return}
+  const ctx=el.getContext("2d");if(!ctx){setTimeout(swap,1650);setTimeout(end,2950);return}
   const W=innerWidth,H=innerHeight,d=Math.min(devicePixelRatio||1,2),cx=W/2,cy=H/2;
   el.width=Math.max(1,Math.round(W*d));el.height=Math.max(1,Math.round(H*d));ctx.setTransform(d,0,0,d,0,0);document.body.append(el);
 
@@ -5632,105 +5632,182 @@ addEventListener("scroll",()=>{const d=document.querySelector(".zx-gfx");if(d)d.
   const isMob=W<768||(navigator.hardwareConcurrency||8)<=4;
   const R_globe=Math.min(W,H)*(isMob?0.29:0.25);
 
-  // 1. Generate 3D Mathematical Real Globe Points
-  const globePoints=[];
-  const phi=Math.PI*(3-Math.sqrt(5)); // Golden ratio angle
+  // 1. Accurate Real Earth Geography Classifier
+  function getEarthRegion(lat,lon){
+    while(lon>180)lon-=360;
+    while(lon<-180)lon+=360;
 
-  // A. Fibonacci sphere uniform grid
-  const SPHERE_COUNT=isMob?750:1350;
-  for(let i=0;i<SPHERE_COUNT;i++){
-    const y=1-(i/(SPHERE_COUNT-1))*2;
+    // Polar Ice Caps
+    if(lat<-60||lat>78)return"ice";
+    if(lat>=59&&lat<=83&&lon>=-56&&lon<=-18)return"ice"; // Greenland
+
+    // Australia & New Zealand
+    if(lat>=-39&&lat<=-11&&lon>=113&&lon<=154){
+      if(lat<-32&&lon>115&&lon<132)return"ocean";
+      return(lon>120&&lon<140&&lat<-18&&lat>-30)?"desert":"land";
+    }
+    if(lat>=-47&&lat<=-34&&lon>=165&&lon<=179)return"land";
+
+    // Africa & Sahara
+    if(lat>=-35&&lat<=37&&lon>=-18&&lon<=52){
+      if(lat>32&&lon<-5)return"ocean";
+      if(lat>30&&lon>10&&lon<25&&lat<34)return"ocean";
+      if(lat<12&&lon>48)return"ocean";
+      if(lat<-10&&lon<11)return"ocean";
+      if(lat<-20&&lon<14)return"ocean";
+      if(lat<-30&&lon>33)return"ocean";
+      return(lat>15&&lat<30&&lon>-10&&lon<35)?"desert":"land";
+    }
+    if(lat>=-26&&lat<=-12&&lon>=43&&lon<=51)return"land"; // Madagascar
+
+    // South America
+    if(lat>=-56&&lat<=13&&lon>=-82&&lon<=-34){
+      if(lat<-18&&lon>-55&&lon<-40&&lat<-40)return"ocean";
+      if(lat<-40&&lon>-60)return"ocean";
+      if(lat>8&&lon<-78)return"ocean";
+      if(lat<-20&&lon<-72)return"ocean";
+      return"land";
+    }
+
+    // North America
+    if(lat>=7&&lat<=72&&lon>=-168&&lon<=-52){
+      if(lat>=55&&lon<-130)return"land"; // Alaska
+      if(lat>=24&&lat<=70&&lon>=-130&&lon<=-65){
+        if(lat>=20&&lat<=30&&lon>=-97&&lon<=-82)return"ocean";
+        if(lat>=52&&lat<=65&&lon>=-95&&lon<=-78)return"ocean";
+        return"land";
+      }
+      if(lat>=8&&lat<=32&&lon>=-116&&lon<=-76){
+        if(lat<16&&(lon<-93||lon>-82))return"ocean";
+        return"land";
+      }
+    }
+
+    // Europe
+    if(lat>=35&&lat<=71&&lon>=-10&&lon<=45){
+      if(lat>=50&&lat<=60&&lon>=-11&&lon<=2)return"land";
+      if(lat>=55&&lat<=71&&lon>=4&&lon<=32)return"land";
+      if(lat>=34&&lat<=43&&lon>=-2&&lon<=26&&!(lat>39&&lon>8&&lon<18))return"ocean";
+      return"land";
+    }
+
+    // India & South Asia Subcontinent
+    if(lat>=6&&lat<=36&&lon>=67&&lon<=92){
+      if(lat<22){
+        const centerLon=78.5;
+        const halfWidth=4+(lat-6)*0.55;
+        if(Math.abs(lon-centerLon)>halfWidth)return"ocean";
+      }
+      return"land";
+    }
+
+    // Arabia
+    if(lat>=12&&lat<=34&&lon>=35&&lon<=60){
+      if(lat>=24&&lat<=30&&lon>=48&&lon<=56)return"ocean";
+      return"desert";
+    }
+
+    // Asia (China, Russia, East Asia, SE Asia)
+    if(lat>=-10&&lat<=78&&lon>=45&&lon<=180){
+      if(lat>=30&&lat<=46&&lon>=128&&lon<=146)return"land";
+      if(lat>=50&&lat<=78&&lon>=45&&lon<=180)return"land";
+      if(lat>=20&&lat<=50&&lon>=75&&lon<=125){
+        return(lat>35&&lat<45&&lon>78&&lon<95)?"desert":"land";
+      }
+      if(lat>=-10&&lat<=22&&lon>=95&&lon<=142){
+        if(lat>=8&&lat<=22&&lon>=98&&lon<=110)return"land";
+        if(lat>=-8&&lat<=6&&lon>=95&&lon<=120)return"land";
+        if(lat>=5&&lat<=19&&lon>=118&&lon<=126)return"land";
+        return"ocean";
+      }
+    }
+
+    return"ocean";
+  }
+
+  // Color palettes for Earth regions
+  const LAND_COLORS=["#10b981","#059669","#16a34a","#22c55e","#34d399"];
+  const DESERT_COLORS=["#f59e0b","#d97706","#b45309","#eab308"];
+  const OCEAN_COLORS=["#0284c7","#2563eb","#1d4ed8","#0ea5e9","#06b6d4","#38bdf8"];
+  const ICE_COLORS=["#ffffff","#f0f9ff","#e0f2fe","#bae6fd"];
+
+  // 2. Generate HD Fibonacci Sphere Points & Classify
+  const N_PTS=isMob?1250:2150;
+  const phi=Math.PI*(3-Math.sqrt(5)); // Golden ratio
+  const globePoints=[];
+
+  for(let i=0;i<N_PTS;i++){
+    const y=1-(i/(N_PTS-1))*2;
     const rAtY=Math.sqrt(Math.max(0,1-y*y));
     const theta=phi*i;
+    const x=Math.cos(theta)*rAtY;
+    const z=Math.sin(theta)*rAtY;
+
+    const lat=Math.asin(y)*(180/Math.PI);
+    const lon=Math.atan2(z,x)*(180/Math.PI);
+    const region=getEarthRegion(lat,lon);
+
+    let color,lineColor,size;
+    if(region==="land"){
+      color=LAND_COLORS[(Math.random()*LAND_COLORS.length)|0];
+      lineColor="rgba(16, 185, 129, 0.42)";
+      size=1.2+Math.random()*0.45;
+    }else if(region==="desert"){
+      color=DESERT_COLORS[(Math.random()*DESERT_COLORS.length)|0];
+      lineColor="rgba(245, 158, 11, 0.38)";
+      size=1.15+Math.random()*0.4;
+    }else if(region==="ice"){
+      color=ICE_COLORS[(Math.random()*ICE_COLORS.length)|0];
+      lineColor="rgba(255, 255, 255, 0.55)";
+      size=1.1+Math.random()*0.35;
+    }else{
+      color=OCEAN_COLORS[(Math.random()*OCEAN_COLORS.length)|0];
+      lineColor="rgba(14, 165, 233, 0.28)";
+      size=0.85+Math.random()*0.35;
+    }
+
     globePoints.push({
-      x:Math.cos(theta)*rAtY,
-      y:y,
-      z:Math.sin(theta)*rAtY,
-      type:"grid",
-      size:0.7+Math.random()*0.45
+      x,y,z,
+      lat,lon,
+      region,
+      color,
+      lineColor,
+      size,
+      neighbors:[]
     });
   }
 
-  // B. Latitude Parallels (Equator, Tropics, Polar circles)
-  const parallels=[-60,-40,-20,0,20,40,60];
-  parallels.forEach((pDeg)=>{
-    const lat=(pDeg*Math.PI)/180;
-    const y=Math.sin(lat);
-    const rRing=Math.cos(lat);
-    const count=Math.round((isMob?32:56)*rRing)+10;
-    for(let j=0;j<count;j++){
-      const lon=(j/count)*Math.PI*2;
-      globePoints.push({
-        x:Math.cos(lon)*rRing,
-        y:y,
-        z:Math.sin(lon)*rRing,
-        type:pDeg===0?"equator":"parallel",
-        size:pDeg===0?1.1:0.75
-      });
-    }
-  });
-
-  // C. Longitude Meridians
-  const numMeridians=isMob?8:12;
-  for(let m=0;m<numMeridians;m++){
-    const lon=(m/numMeridians)*Math.PI*2;
-    const pCount=isMob?22:36;
-    for(let k=0;k<pCount;k++){
-      const lat=(-Math.PI/2)+(k/(pCount-1))*Math.PI;
-      const y=Math.sin(lat);
-      const rRing=Math.cos(lat);
-      globePoints.push({
-        x:Math.cos(lon)*rRing,
-        y:y,
-        z:Math.sin(lon)*rRing,
-        type:"meridian",
-        size:0.72
-      });
+  // 3. Precompute Connected Mesh Edges ("particles joined")
+  const maxConnDist=isMob?0.13:0.115;
+  const maxConnDistSq=maxConnDist*maxConnDist;
+  for(let i=0;i<globePoints.length;i++){
+    const p1=globePoints[i];
+    for(let j=i+1;j<globePoints.length;j++){
+      const p2=globePoints[j];
+      const dx=p1.x-p2.x,dy=p1.y-p2.y,dz=p1.z-p2.z;
+      if(dx*dx+dy*dy+dz*dz<maxConnDistSq){
+        p1.neighbors.push(j);
+      }
     }
   }
 
-  // D. Real Continental Landmass Clusters
-  const continentBoxes=[
-    // India & South Asia (High density, sharp forensic focus)
-    {lat:[8,35],lon:[68,92],n:isMob?120:250},
-    // Rest of Asia
-    {lat:[18,55],lon:[95,145],n:isMob?160:340},
-    {lat:[52,70],lon:[45,170],n:isMob?100:200},
-    {lat:[14,38],lon:[35,62],n:isMob?75:140},
-    {lat:[-8,20],lon:[95,130],n:isMob?80:160},
-    // Europe
-    {lat:[36,68],lon:[-10,42],n:isMob?140:280},
-    // Africa
-    {lat:[-34,37],lon:[-17,50],n:isMob?170:340},
-    // North America
-    {lat:[18,65],lon:[-155,-60],n:isMob?170:340},
-    // South America
-    {lat:[-54,12],lon:[-80,-35],n:isMob?130:250},
-    // Australia & Oceania
-    {lat:[-40,-12],lon:[113,153],n:isMob?85:170},
-    // Antarctica rim
-    {lat:[-84,-70],lon:[-180,180],n:isMob?65:130}
-  ];
+  // 4. Floating atmospheric cloud particles
+  const CLOUD_COUNT=isMob?60:120;
+  const cloudPoints=[];
+  for(let i=0;i<CLOUD_COUNT;i++){
+    const y=1-(i/(CLOUD_COUNT-1))*2;
+    const rAtY=Math.sqrt(Math.max(0,1-y*y))*1.025;
+    const theta=(phi*1.37*i)%(Math.PI*2);
+    cloudPoints.push({
+      x:Math.cos(theta)*rAtY,
+      y:y*1.025,
+      z:Math.sin(theta)*rAtY,
+      size:1.6+Math.random()*1.8,
+      speed:0.00015+Math.random()*0.0001
+    });
+  }
 
-  continentBoxes.forEach((b)=>{
-    for(let i=0;i<b.n;i++){
-      const latDeg=b.lat[0]+Math.random()*(b.lat[1]-b.lat[0]);
-      const lonDeg=b.lon[0]+Math.random()*(b.lon[1]-b.lon[0]);
-      const lat=(latDeg*Math.PI)/180;
-      const lon=(lonDeg*Math.PI)/180;
-      const y=Math.sin(lat);
-      const r=Math.cos(lat);
-      globePoints.push({
-        x:Math.cos(lon)*r,
-        y:y,
-        z:Math.sin(lon)*r,
-        type:"continent",
-        size:0.9+Math.random()*0.45
-      });
-    }
-  });
-
-  // Assign random starting positions in outer space for smooth inward assembly
+  // Assign random starting positions in outer space for smooth assembly
   const particles=globePoints.map((p)=>{
     const ang=Math.random()*Math.PI*2;
     const dist=Math.max(W,H)*(0.55+Math.random()*0.75);
@@ -5740,12 +5817,19 @@ addEventListener("scroll",()=>{const d=document.querySelector(".zx-gfx");if(d)d.
       tx:p.x,
       ty:p.y,
       tz:p.z,
+      region:p.region,
+      color:p.color,
+      lineColor:p.lineColor,
       size:p.size,
-      type:p.type
+      neighbors:p.neighbors,
+      drawX:0,
+      drawY:0,
+      pz:0,
+      scale:1
     };
   });
 
-  // Major continental hubs for global surveillance great-circle arcs
+  // Major continental hubs for global forensic arcs
   const HUBS=[
     {name:"Delhi",lat:28.6,lon:77.2},
     {name:"London",lat:51.5,lon:-0.1},
@@ -5780,6 +5864,11 @@ addEventListener("scroll",()=>{const d=document.querySelector(".zx-gfx");if(d)d.
   const tilt=0.38; // 21.8 degrees axial tilt
   const cosT=Math.cos(tilt);
   const sinT=Math.sin(tilt);
+
+  // Directional Sun Light Vector
+  const lightVec=[-0.45,0.55,0.7];
+  const lLen=Math.hypot(lightVec[0],lightVec[1],lightVec[2]);
+  const lx=lightVec[0]/lLen,ly=lightVec[1]/lLen,lz=lightVec[2]/lLen;
 
   const finish=()=>{
     if(done)return;
@@ -5828,15 +5917,27 @@ addEventListener("scroll",()=>{const d=document.querySelector(".zx-gfx");if(d)d.
     ctx.fillStyle=bgGrad;
     ctx.fillRect(0,0,W,H);
 
-    // 2. Soft inner spherical glow behind the globe
-    const coreGlow=ctx.createRadialGradient(cx,cy,0,cx,cy,R_globe*1.12);
-    coreGlow.addColorStop(0,"rgba(255, 255, 255, 0.95)");
-    coreGlow.addColorStop(0.72,"rgba(247, 244, 238, 0.7)");
-    coreGlow.addColorStop(1,"rgba(236, 230, 218, 0)");
-    ctx.fillStyle=coreGlow;
+    // 2. Luminous Cyan / Ocean Blue Atmosphere Glow around Earth
+    const atmo=ctx.createRadialGradient(cx,cy,R_globe*0.92,cx,cy,R_globe*1.28);
+    atmo.addColorStop(0,`rgba(56, 189, 248, ${0.32*globalFade})`);
+    atmo.addColorStop(0.45,`rgba(14, 165, 233, ${0.14*globalFade})`);
+    atmo.addColorStop(1,"rgba(14, 165, 233, 0)");
+    ctx.fillStyle=atmo;
     ctx.beginPath();
-    ctx.arc(cx,cy,R_globe*1.12,0,Math.PI*2);
+    ctx.arc(cx,cy,R_globe*1.28,0,Math.PI*2);
     ctx.fill();
+
+    // Soft inner spherical core shadow for real 3D sphere volume
+    const sphereBase=ctx.createRadialGradient(cx-R_globe*0.25,cy-R_globe*0.25,R_globe*0.1,cx,cy,R_globe);
+    sphereBase.addColorStop(0,"#0369a1");
+    sphereBase.addColorStop(0.65,"#0f172a");
+    sphereBase.addColorStop(1,"#020617");
+    ctx.globalAlpha=0.78*globalFade;
+    ctx.fillStyle=sphereBase;
+    ctx.beginPath();
+    ctx.arc(cx,cy,R_globe,0,Math.PI*2);
+    ctx.fill();
+    ctx.globalAlpha=1;
 
     // 3. Globe 3D Rotation Calculation
     const rotY=elapsed*0.00115;
@@ -5860,7 +5961,7 @@ addEventListener("scroll",()=>{const d=document.querySelector(".zx-gfx");if(d)d.
       return{
         x:cx+px*R_globe*scale,
         y:cy+py*R_globe*scale,
-        pz,
+        px,py,pz,
         scale
       };
     };
@@ -5873,42 +5974,12 @@ addEventListener("scroll",()=>{const d=document.querySelector(".zx-gfx");if(d)d.
     const exitProgress=elapsed>2000?Math.min(1,(elapsed-2000)/950):0;
     const expand=1+Math.pow(exitProgress,2)*0.55;
 
-    // 4. Render Global Surveillance Great-Circle Arcs
-    if(elapsed>450){
-      const arcFade=Math.min(1,(elapsed-450)/400)*globalFade;
-      ctx.lineWidth=0.75;
-      ROUTES.forEach(([h1Idx,h2Idx])=>{
-        const h1=HUBS[h1Idx];
-        const h2=HUBS[h2Idx];
-        const p1=project3D(h1.x,h1.y,h1.z);
-        const p2=project3D(h2.x,h2.y,h2.z);
-
-        if(p1.pz>-0.2||p2.pz>-0.2){
-          const midX=(p1.x+p2.x)/2;
-          const midY=(p1.y+p2.y)/2-28*((p1.scale+p2.scale)/2);
-          ctx.strokeStyle=`rgba(10, 13, 20, ${0.14*arcFade})`;
-          ctx.beginPath();
-          ctx.moveTo(p1.x,p1.y);
-          ctx.quadraticCurveTo(midX,midY,p2.x,p2.y);
-          ctx.stroke();
-
-          // Traveling pulse on the route
-          const pulseT=(elapsed*0.0012+h1Idx*0.3)%1;
-          const qx=Math.pow(1-pulseT,2)*p1.x+2*(1-pulseT)*pulseT*midX+Math.pow(pulseT,2)*p2.x;
-          const qy=Math.pow(1-pulseT,2)*p1.y+2*(1-pulseT)*pulseT*midY+Math.pow(pulseT,2)*p2.y;
-          ctx.fillStyle="#0A0D14";
-          ctx.globalAlpha=arcFade*0.8;
-          ctx.beginPath();
-          ctx.arc(qx,qy,1.4,0,Math.PI*2);
-          ctx.fill();
-        }
-      });
-    }
-
-    // 5. Render Nano-Particles in Deep Carbon Black
+    // Precalculate screen coordinates for all particles
     for(let i=0;i<particles.length;i++){
       const p=particles[i];
       const prj=project3D(p.tx,p.ty,p.tz);
+      p.pz=prj.pz;
+      p.scale=prj.scale;
 
       let targetX=prj.x;
       let targetY=prj.y;
@@ -5918,37 +5989,134 @@ addEventListener("scroll",()=>{const d=document.querySelector(".zx-gfx");if(d)d.
         targetY=cy+(targetY-cy)*expand;
       }
 
-      let drawX,drawY;
       if(assembleProgress<1){
-        drawX=p.startX+(targetX-p.startX)*easeAssemble;
-        drawY=p.startY+(targetY-p.startY)*easeAssemble;
+        p.drawX=p.startX+(targetX-p.startX)*easeAssemble;
+        p.drawY=p.startY+(targetY-p.startY)*easeAssemble;
       }else{
-        drawX=targetX;
-        drawY=targetY;
+        p.drawX=targetX;
+        p.drawY=targetY;
       }
+    }
 
-      const pz=prj.pz;
-      const isFront=pz>-0.06;
-      const frontAlpha=0.75+0.25*Math.max(0,pz);
-      const backAlpha=0.12+0.18*((pz+1)/0.94);
+    // 4. DRAW JOINED MESH FILAMENTS ("particle joined")
+    ctx.lineWidth=0.7;
+    for(let i=0;i<particles.length;i++){
+      const p1=particles[i];
+      if(p1.pz<-0.12)continue; // only front hemisphere for crispness
+
+      for(let k=0;k<p1.neighbors.length;k++){
+        const j=p1.neighbors[k];
+        if(j>i){
+          const p2=particles[j];
+          if(p2.pz<-0.12)continue;
+
+          // Determine line styling based on connection type
+          const isCoast=(p1.region==="land"&&p2.region==="ocean")||(p1.region==="ocean"&&p2.region==="land");
+          if(isCoast){
+            ctx.strokeStyle=`rgba(56, 189, 248, ${0.5*globalFade})`;
+          }else{
+            ctx.strokeStyle=p1.lineColor;
+          }
+
+          ctx.beginPath();
+          ctx.moveTo(p1.drawX,p1.drawY);
+          ctx.lineTo(p2.drawX,p2.drawY);
+          ctx.stroke();
+        }
+      }
+    }
+
+    // 5. DRAW MULTI-COLORED HD EARTH PARTICLES
+    for(let i=0;i<particles.length;i++){
+      const p=particles[i];
+      const pz=p.pz;
+      const isFront=pz>-0.08;
+
+      // Sun illumination shading
+      const dot=p.tx*lx+p.ty*ly+p.tz*lz;
+      const sunShade=Math.max(0.35,Math.min(1.0,0.65+0.35*dot));
+
+      const frontAlpha=(0.75+0.25*Math.max(0,pz))*sunShade;
+      const backAlpha=0.1+0.16*((pz+1)/0.92);
       const alpha=(isFront?frontAlpha:backAlpha)*globalFade;
 
-      const size=p.size*(isFront?1.05*prj.scale:0.72*prj.scale);
+      const size=p.size*(isFront?(1.05*p.scale):(0.72*p.scale));
 
       ctx.globalAlpha=Math.max(0,Math.min(1,alpha));
-      ctx.fillStyle=isFront?"#0A0D14":"#4B5563";
+      ctx.fillStyle=p.color;
 
       ctx.beginPath();
-      ctx.arc(drawX,drawY,Math.max(0.42,size*0.75),0,Math.PI*2);
+      ctx.arc(p.drawX,p.drawY,Math.max(0.5,size*0.75),0,Math.PI*2);
       ctx.fill();
     }
 
-    // 6. Orbital Forensic Scanning Ring
+    // 6. FLOATING ATMOSPHERIC CLOUDS
+    if(elapsed>300){
+      const cloudFade=Math.min(1,(elapsed-300)/450)*globalFade;
+      ctx.fillStyle="#ffffff";
+      for(let i=0;i<cloudPoints.length;i++){
+        const cp=cloudPoints[i];
+        // Rotate cloud slightly faster than earth
+        const cRot=elapsed*(0.00115+cp.speed);
+        const cx1=cp.x*Math.cos(cRot)+cp.z*Math.sin(cRot);
+        const cz1=-cp.x*Math.sin(cRot)+cp.z*Math.cos(cRot);
+        const cy1=cp.y;
+
+        const cpx=cx1*cosT-cy1*sinT;
+        const cpy=cx1*sinT+cy1*cosT;
+        const cpz=cz1;
+
+        if(cpz>-0.05){
+          const cScale=camDist/(camDist-cpz*0.36);
+          const cScreenX=cx+cpx*R_globe*cScale;
+          const cScreenY=cy+cpy*R_globe*cScale;
+
+          ctx.globalAlpha=Math.max(0,Math.min(0.72,(0.35+0.35*cpz)*cloudFade));
+          ctx.beginPath();
+          ctx.arc(cScreenX,cScreenY,cp.size*cScale*0.7,0,Math.PI*2);
+          ctx.fill();
+        }
+      }
+    }
+
+    // 7. Global Surveillance Great-Circle Hub Arcs
+    if(elapsed>450){
+      const arcFade=Math.min(1,(elapsed-450)/400)*globalFade;
+      ctx.lineWidth=0.9;
+      ROUTES.forEach(([h1Idx,h2Idx])=>{
+        const h1=HUBS[h1Idx];
+        const h2=HUBS[h2Idx];
+        const p1=project3D(h1.x,h1.y,h1.z);
+        const p2=project3D(h2.x,h2.y,h2.z);
+
+        if(p1.pz>-0.15||p2.pz>-0.15){
+          const midX=(p1.x+p2.x)/2;
+          const midY=(p1.y+p2.y)/2-28*((p1.scale+p2.scale)/2);
+          ctx.strokeStyle=`rgba(56, 189, 248, ${0.45*arcFade})`;
+          ctx.beginPath();
+          ctx.moveTo(p1.x,p1.y);
+          ctx.quadraticCurveTo(midX,midY,p2.x,p2.y);
+          ctx.stroke();
+
+          // Traveling pulse on the route
+          const pulseT=(elapsed*0.0012+h1Idx*0.3)%1;
+          const qx=Math.pow(1-pulseT,2)*p1.x+2*(1-pulseT)*pulseT*midX+Math.pow(pulseT,2)*p2.x;
+          const qy=Math.pow(1-pulseT,2)*p1.y+2*(1-pulseT)*pulseT*midY+Math.pow(pulseT,2)*p2.y;
+          ctx.fillStyle="#38bdf8";
+          ctx.globalAlpha=arcFade*0.9;
+          ctx.beginPath();
+          ctx.arc(qx,qy,2.0,0,Math.PI*2);
+          ctx.fill();
+        }
+      });
+    }
+
+    // 8. Tilted Orbital Laser Scanner Ring
     ctx.save();
     ctx.translate(cx,cy);
     ctx.rotate(-0.34);
-    ctx.strokeStyle=`rgba(10, 13, 20, ${0.16*globalFade})`;
-    ctx.lineWidth=0.85;
+    ctx.strokeStyle=`rgba(14, 165, 233, ${0.35*globalFade})`;
+    ctx.lineWidth=0.9;
     ctx.setLineDash([4,8]);
     ctx.beginPath();
     ctx.ellipse(0,0,R_globe*1.28,R_globe*0.42,0,0,Math.PI*2);
@@ -5957,14 +6125,14 @@ addEventListener("scroll",()=>{const d=document.querySelector(".zx-gfx");if(d)d.
     const pulseAng=elapsed*0.0022;
     const pulseX=Math.cos(pulseAng)*(R_globe*1.28);
     const pulseY=Math.sin(pulseAng)*(R_globe*0.42);
-    ctx.fillStyle="#0A0D14";
-    ctx.globalAlpha=0.9*globalFade;
+    ctx.fillStyle="#06b6d4";
+    ctx.globalAlpha=0.95*globalFade;
     ctx.beginPath();
-    ctx.arc(pulseX,pulseY,2.2,0,Math.PI*2);
+    ctx.arc(pulseX,pulseY,2.5,0,Math.PI*2);
     ctx.fill();
     ctx.restore();
 
-    // 7. Minimalist Typography & Verification Progress Bar
+    // 9. Minimalist Typography & Verification Progress Bar
     const labelY=cy+R_globe*1.34;
     ctx.textAlign="center";
     ctx.textBaseline="middle";
@@ -5977,7 +6145,7 @@ addEventListener("scroll",()=>{const d=document.querySelector(".zx-gfx");if(d)d.
 
     ctx.font="500 10px 'JetBrains Mono', monospace";
     try{ctx.letterSpacing="2px"}catch(_){}
-    ctx.fillStyle="#4B5563";
+    ctx.fillStyle="#0284c7";
     ctx.globalAlpha=Math.min(1,Math.max(0,(elapsed-550)/450))*globalFade;
     ctx.fillText("INITIALIZING BIOMETRIC SCANNER",cx,labelY+22);
 
@@ -5986,7 +6154,7 @@ addEventListener("scroll",()=>{const d=document.querySelector(".zx-gfx");if(d)d.
     const barProg=Math.min(1,Math.max(0,(elapsed-300)/1400));
     ctx.fillStyle="rgba(10, 13, 20, 0.1)";
     ctx.fillRect(cx-barW/2,labelY+34,barW,barH);
-    ctx.fillStyle="#0A0D14";
+    ctx.fillStyle="#0284c7";
     ctx.fillRect(cx-barW/2,labelY+34,barW*barProg,barH);
 
     ctx.globalAlpha=1;

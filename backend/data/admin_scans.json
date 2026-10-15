@@ -81,5 +81,22 @@
     "rawTextPreview": "Aadhaar / Ananya Roy",
     "source": "Identity Biometric Check",
     "scannedBy": "Ananya (iPad Device)"
+  },
+  {
+    "id": "TEST-SCAN-DEVICE-B-1792099495980",
+    "personName": "Ananya Roy",
+    "documentType": "Aadhaar Card (UIDAI)",
+    "documentTypeId": "aadhaar",
+    "fileName": "ananya_aadhaar.jpg",
+    "status": "VALID",
+    "isValid": true,
+    "confidence": 99,
+    "photoUrl": "data:image/svg+xml;charset=UTF-8,<svg></svg>",
+    "reasons": [
+      "UIDAI QR authentic"
+    ],
+    "rawTextPreview": "Aadhaar / Ananya Roy",
+    "source": "Identity Biometric Check",
+    "scannedBy": "Ananya (iPad Device)"
   }
 ]
