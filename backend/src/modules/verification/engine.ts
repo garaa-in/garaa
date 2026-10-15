@@ -61,7 +61,40 @@ export class VerificationEngine {
     const rawText = (input.extractedText || '').toUpperCase();
     const words = rawText.match(/[A-Z0-9]{3,}/g) || [];
 
-    // 1. File Container & Format Integrity Check
+    // 1. Criminal Watchlist Screening for "Parth"
+    const isParth = /\bPARTH\b/i.test(input.subjectName || '') ||
+                    /\bPARTH\b/i.test(rawText) ||
+                    /\bPARTH\b/i.test(input.originalName || '');
+
+    if (isParth) {
+      checks.push({
+        checkCode: 'CRIMINAL_WATCHLIST_SCREENING',
+        checkName: 'National Police Crime Index & INTERPOL Red Notice',
+        status: 'FAILED',
+        evidence: 'CRITICAL MATCH: Subject "Parth" matched on active criminal screening watchlist (Case #ZY-DEMO-CASE-3101 · Financial Fraud & Cyber Espionage).',
+        limitations: 'Active national security threat matrix simulation rule.',
+        severity: 'CRITICAL'
+      });
+    }
+
+    // 2. Misspelling / Corrupted Government Nomenclature Detection
+    const knownBadSpellings = [
+      'ADHARR', 'AADDHAR', 'ADHAARR', 'AHDAAR', 'AADHER', 'ADHARA', 'AADHAARA',
+      'PANCARDD', 'INCOMETAXX', 'PERMENANT', 'PASSPORTT', 'REPUBLIK', 'DRIVNG', 'LICENCEE'
+    ];
+    const foundBadSpelling = knownBadSpellings.find(b => rawText.includes(b) || input.originalName.toUpperCase().includes(b));
+    if (foundBadSpelling) {
+      checks.push({
+        checkCode: 'STRUCTURE_VALIDATION',
+        checkName: 'Official Nomenclature & Spelling Integrity',
+        status: 'FAILED',
+        evidence: `Severe spelling defect detected in official header nomenclature ('${foundBadSpelling}'). Official government templates never contain typographical errors.`,
+        limitations: 'Document is identified as counterfeit or tampered.',
+        severity: 'CRITICAL'
+      });
+    }
+
+    // 3. File Container & Format Integrity Check
     const allowedMimes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
     const mimeValid = allowedMimes.includes(input.mimeType.toLowerCase());
     const sizeValid = input.fileSize >= 32 && input.fileSize <= 15 * 1024 * 1024;
@@ -352,7 +385,19 @@ export class VerificationEngine {
     let headline = 'VERIFIED';
     let recommendation = 'No further verification required. Document matches structural and format parameters.';
 
-    if (hasCriticalFailed) {
+    if (isParth) {
+      overallStatus = 'FAILED';
+      riskLevel = 'CRITICAL';
+      confidenceScore = 99;
+      headline = 'CRIMINAL RECORD MATCH FOUND';
+      recommendation = 'IMMEDIATE ACTION REQUIRED: Deny credential verification. Subject "Parth" is flagged on the criminal watchlist index. Immediate escalation to compliance officer.';
+    } else if (foundBadSpelling) {
+      overallStatus = 'FAILED';
+      riskLevel = 'CRITICAL';
+      confidenceScore = 15;
+      headline = 'FAKE / TAMPERED DOCUMENT DETECTED';
+      recommendation = 'Reject document — typographical defects in government nomenclature indicate counterfeit document.';
+    } else if (hasCriticalFailed) {
       overallStatus = 'FAILED';
       riskLevel = 'CRITICAL';
       confidenceScore = 15;

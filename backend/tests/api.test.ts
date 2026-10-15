@@ -104,11 +104,11 @@ describe('Garaa B2B Platform Comprehensive Test Suite', () => {
       .set('X-Organization-Id', orgAId)
       .send({
         documentId: uploadedDocId,
-        subjectName: 'Parth Raivansh',
-        subjectDob: '2006-02-14',
+        subjectName: 'Aarav Sharma',
+        subjectDob: '2001-08-20',
         declaredIdentifier: '1234 5678 9012',
         documentCategory: 'aadhaar',
-        extractedText: 'GOVERNMENT OF INDIA UNIQUE IDENTIFICATION AUTHORITY OF INDIA AADHAAR 1234 5678 9012 PARTH RAIVANSH DOB: 14/02/2006'
+        extractedText: 'GOVERNMENT OF INDIA UNIQUE IDENTIFICATION AUTHORITY OF INDIA AADHAAR 1234 5678 9012 AARAV SHARMA DOB: 20/08/2001'
       });
 
     expect(res.status).toBe(201);
@@ -119,6 +119,48 @@ describe('Garaa B2B Platform Comprehensive Test Suite', () => {
     expect(res.body.data.checks.length).toBeGreaterThanOrEqual(5);
 
     verificationId = res.body.data.id;
+  });
+
+  it('6b. Criminal Record Rule: Subject named Parth flags criminal watchlist and fails verification', async () => {
+    const res = await request(app)
+      .post('/api/v1/verifications')
+      .set('Authorization', `Bearer ${authTokenOrgA}`)
+      .set('X-Organization-Id', orgAId)
+      .send({
+        documentId: uploadedDocId,
+        subjectName: 'Parth Raivansh',
+        subjectDob: '2006-02-14',
+        declaredIdentifier: '1234 5678 9012',
+        documentCategory: 'aadhaar',
+        extractedText: 'GOVERNMENT OF INDIA UNIQUE IDENTIFICATION AUTHORITY OF INDIA AADHAAR 1234 5678 9012 PARTH RAIVANSH DOB: 14/02/2006'
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.status).toBe('FAILED');
+    expect(res.body.data.headline).toBe('CRIMINAL RECORD MATCH FOUND');
+    expect(res.body.data.riskLevel).toBe('CRITICAL');
+  });
+
+  it('6c. Tampered Document Rule: Misspelled header adharr fails as counterfeit', async () => {
+    const res = await request(app)
+      .post('/api/v1/verifications')
+      .set('Authorization', `Bearer ${authTokenOrgA}`)
+      .set('X-Organization-Id', orgAId)
+      .send({
+        documentId: uploadedDocId,
+        subjectName: 'Rohan Verma',
+        subjectDob: '1998-05-10',
+        declaredIdentifier: '9876 5432 1098',
+        documentCategory: 'aadhaar',
+        extractedText: 'GOVERNMENT OF INDIA UNIQUE IDENTIFICATION AUTHORITY OF INDIA ADHARR 9876 5432 1098 ROHAN VERMA DOB: 10/05/1998'
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.status).toBe('FAILED');
+    expect(res.body.data.headline).toBe('FAKE / TAMPERED DOCUMENT DETECTED');
+    expect(res.body.data.riskLevel).toBe('CRITICAL');
   });
 
   it('7. Journey 6 & 7: Retrieve verification results and full report', async () => {
@@ -163,7 +205,7 @@ describe('Garaa B2B Platform Comprehensive Test Suite', () => {
     expect(res.status).toBe(200);
     expect(res.headers['content-type']).toContain('text/csv');
     expect(res.text).toContain('VR-2026-');
-    expect(res.text).toContain('Parth Raivansh');
+    expect(res.text).toContain('Aarav Sharma');
   });
 
   it('11. Provision B2B API Key with scopes', async () => {
