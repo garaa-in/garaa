@@ -1,0 +1,198 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Organization {
+  id                   String                @id @default(uuid())
+  name                 String
+  slug                 String                @unique
+  domain               String?
+  tier                 String                @default("ENTERPRISE")
+  settings             String?               // JSON configuration
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+
+  members              OrganizationMember[]
+  documents            Document[]
+  verificationRequests VerificationRequest[]
+  apiKeys              ApiKey[]
+  webhooks             WebhookEndpoint[]
+  auditLogs            AuditLog[]
+}
+
+model User {
+  id                 String               @id @default(uuid())
+  email              String               @unique
+  passwordHash       String
+  fullName           String
+  systemRole         String               @default("USER") // USER, PLATFORM_ADMIN
+  resetToken         String?
+  resetTokenExpires  DateTime?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  memberships        OrganizationMember[]
+  auditLogs          AuditLog[]
+}
+
+model OrganizationMember {
+  id             String       @id @default(uuid())
+  organizationId String
+  userId         String
+  role           String       @default("MEMBER") // OWNER, ADMIN, MEMBER, REVIEWER, PLATFORM_ADMIN
+  status         String       @default("ACTIVE") // ACTIVE, INVITED, SUSPENDED
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+}
+
+model Document {
+  id             String        @id @default(uuid())
+  organizationId String
+  fileName       String
+  originalName   String
+  mimeType       String
+  fileSize       Int
+  sha256Hash     String
+  storagePath    String
+  extractedText  String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  verifications  VerificationRequest[]
+
+  @@index([organizationId])
+  @@index([sha256Hash])
+}
+
+model VerificationRequest {
+  id                 String              @id @default(uuid())
+  requestNumber      String              @unique
+  organizationId     String
+  documentId         String?
+  subjectName        String
+  subjectDob         String?
+  declaredIdentifier String?
+  documentCategory   String              // aadhaar, pan, passport, dl, birth, leaving, edu, other
+  status             String              @default("SUBMITTED") // DRAFT, SUBMITTED, PROCESSING, NEEDS_REVIEW, VERIFIED, UNABLE_TO_VERIFY, REJECTED
+  riskLevel          String              @default("LOW")       // LOW, MEDIUM, HIGH, CRITICAL
+  confidenceScore    Int                 @default(0)
+  headline           String?
+  recommendation     String?
+  reviewerId         String?
+  reviewerNotes      String?
+  reviewedAt         DateTime?
+  credentialId       String?             @unique
+  submittedAt        DateTime            @default(now())
+  completedAt        DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  organization       Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  document           Document?           @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  checks             VerificationCheck[]
+
+  @@index([organizationId])
+  @@index([status])
+  @@index([documentCategory])
+}
+
+model VerificationCheck {
+  id                    String              @id @default(uuid())
+  verificationRequestId String
+  checkCode             String              // FILE_INTEGRITY, HASH_DUPLICATE, STRUCTURE_VALIDATION, etc.
+  checkName             String
+  status                String              // VERIFIED, FAILED, INCONCLUSIVE, NOT_CHECKED
+  evidence              String
+  limitations           String?
+  severity              String?             // LOW, MEDIUM, HIGH, CRITICAL
+  createdAt             DateTime            @default(now())
+
+  verificationRequest   VerificationRequest @relation(fields: [verificationRequestId], references: [id], onDelete: Cascade)
+
+  @@index([verificationRequestId])
+}
+
+model ApiKey {
+  id             String       @id @default(uuid())
+  organizationId String
+  name           String
+  keyPrefix      String
+  keyHash        String       @unique
+  scopes         String       @default("read:verifications,write:verifications")
+  lastUsedAt     DateTime?
+  revokedAt      DateTime?
+  expiresAt      DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([keyHash])
+}
+
+model WebhookEndpoint {
+  id             String            @id @default(uuid())
+  organizationId String
+  url            String
+  description    String?
+  secret         String
+  events         String            // JSON array of event names
+  isActive       Boolean           @default(true)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  deliveries     WebhookDelivery[]
+
+  @@index([organizationId])
+}
+
+model WebhookDelivery {
+  id                String          @id @default(uuid())
+  webhookEndpointId String
+  event             String
+  payload           String
+  status            String          // SUCCESS, FAILED, RETRYING
+  statusCode        Int?
+  responseBody      String?
+  attempts          Int             @default(1)
+  deliveredAt       DateTime?
+  createdAt         DateTime        @default(now())
+
+  endpoint          WebhookEndpoint @relation(fields: [webhookEndpointId], references: [id], onDelete: Cascade)
+
+  @@index([webhookEndpointId])
+}
+
+model AuditLog {
+  id             String        @id @default(uuid())
+  organizationId String?
+  userId         String?
+  action         String
+  resource       String
+  resourceId     String?
+  ipAddress      String?
+  userAgent      String?
+  outcome        String        @default("SUCCESS") // SUCCESS, FAILURE, DENIED
+  metadata       String?       // JSON object
+  createdAt      DateTime      @default(now())
+
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  user           User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([action])
+}

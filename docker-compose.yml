@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: garaa-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: garaa_user
+      POSTGRES_PASSWORD: garaa_secure_pass
+      POSTGRES_DB: garaa_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U garaa_user -d garaa_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: garaa-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DATABASE_URL: postgresql://garaa_user:garaa_secure_pass@postgres:5432/garaa_db?schema=public
+      JWT_SECRET: garaa_production_jwt_signing_secret_super_secure_key_2026_9941a
+      STORAGE_PATH: /app/uploads
+      CORS_ORIGIN: "http://localhost:80"
+    ports:
+      - "4000:4000"
+    volumes:
+      - backend_uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: garaa-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
+  backend_uploads:
