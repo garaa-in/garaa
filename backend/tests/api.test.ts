@@ -226,4 +226,146 @@ describe('Garaa B2B Platform Comprehensive Test Suite', () => {
     expect(res.body.data.verifiedCount).toBeGreaterThanOrEqual(1);
     expect(res.body.data.successRate).toBeGreaterThanOrEqual(0);
   });
+
+  it('15. Journey 9: Human Review Queue decision sign-off', async () => {
+    // 1. Create a request that triggers review
+    const dummyBuffer = Buffer.from('UNUSUAL-DOCUMENT-REQUIRING-COMPLIANCE-REVIEW-PAYLOAD');
+    const uploadRes = await request(app)
+      .post('/api/v1/documents/upload')
+      .set('Authorization', `Bearer ${authTokenOrgA}`)
+      .set('X-Organization-Id', orgAId)
+      .attach('file', dummyBuffer, 'flagged_doc.png');
+
+    const flaggedDocId = uploadRes.body.data.document.id;
+
+    const createRes = await request(app)
+      .post('/api/v1/verifications')
+      .set('Authorization', `Bearer ${authTokenOrgA}`)
+      .set('X-Organization-Id', orgAId)
+      .send({
+        documentId: flaggedDocId,
+        subjectName: 'Rohan Sharma',
+        documentCategory: 'pan',
+        declaredIdentifier: 'ABCDE1234F',
+        extractedText: 'TAX DEPARTMENT SOME TEXT'
+      });
+
+    const flaggedVerifId = createRes.body.data.id;
+
+    // 2. Submit human reviewer sign-off decision
+    const reviewRes = await request(app)
+      .post(`/api/v1/verifications/${flaggedVerifId}/review`)
+      .set('Authorization', `Bearer ${authTokenOrgA}`)
+      .set('X-Organization-Id', orgAId)
+      .send({
+        decision: 'VERIFIED',
+        notes: 'Compliance officer verified secondary identification offline.'
+      });
+
+    expect(reviewRes.status).toBe(200);
+    expect(reviewRes.body.success).toBe(true);
+    expect(reviewRes.body.data.status).toBe('VERIFIED');
+    expect(reviewRes.body.data.reviewerNotes).toContain('Compliance officer verified');
+  });
+
+  it('16. Duplicate Document Detection via Cryptographic Bitstream Hash', async () => {
+    // Upload the exact same file buffer again
+    const dummyBuffer = Buffer.from('FAKE-AADHAAR-SYNTHETIC-DOCUMENT-PAYLOAD-FOR-TESTING');
+    const uploadRes = await request(app)
+      .post('/api/v1/documents/upload')
+      .set('Authorization', `Bearer ${authTokenOrgA}`)
+      .set('X-Organization-Id', orgAId)
+      .attach('file', dummyBuffer, 'synthetic_aadhaar_dup.png');
+
+    const dupDocId = uploadRes.body.data.document.id;
+
+    const res = await request(app)
+      .post('/api/v1/verifications')
+      .set('Authorization', `Bearer ${authTokenOrgA}`)
+      .set('X-Organization-Id', orgAId)
+      .send({
+        documentId: dupDocId,
+        subjectName: 'Parth Raivansh Dup',
+        documentCategory: 'aadhaar',
+        declaredIdentifier: '1234 5678 9012'
+      });
+
+    expect(res.status).toBe(201);
+    const hashCheck = res.body.data.checks.find((c: any) => c.checkCode === 'CRYPTOGRAPHIC_HASH');
+    expect(hashCheck).toBeDefined();
+    expect(hashCheck.status).toBe('INCONCLUSIVE');
+    expect(hashCheck.evidence).toContain('Exact cryptographic bitstream match detected');
+  });
+
+  it('17. Summary CSV Export: Streams organization-wide verification report', async () => {
+    const res = await request(app)
+      .get('/api/v1/reports/export/summary-csv')
+      .set('Authorization', `Bearer ${authTokenOrgA}`)
+      .set('X-Organization-Id', orgAId);
+
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toContain('text/csv');
+    expect(res.text).toContain('Request_Number,Subject_Name');
+    expect(res.text).toContain('Parth Raivansh');
+  });
+
+  it('18. Webhook Endpoint Lifecycle: Create endpoint and dispatch test event', async () => {
+    const createRes = await request(app)
+      .post('/api/v1/webhooks')
+      .set('Authorization', `Bearer ${authTokenOrgA}`)
+      .set('X-Organization-Id', orgAId)
+      .send({
+        url: 'https://webhook.site/test-integration-garaa',
+        description: 'Production integration endpoint'
+      });
+
+    expect(createRes.status).toBe(201);
+    expect(createRes.body.success).toBe(true);
+    expect(createRes.body.data.secret).toMatch(/^whsec_/);
+
+    const endpointId = createRes.body.data.id;
+
+    const testPing = await request(app)
+      .post(`/api/v1/webhooks/${endpointId}/test`)
+      .set('Authorization', `Bearer ${authTokenOrgA}`)
+      .set('X-Organization-Id', orgAId);
+
+    expect(testPing.status).toBe(200);
+    expect(testPing.body.message).toContain('Test ping');
+  });
+
+  it('19. Tamper-evident Audit Trail: Inspect recorded actions', async () => {
+    const res = await request(app)
+      .get('/api/v1/audit')
+      .set('Authorization', `Bearer ${authTokenOrgA}`)
+      .set('X-Organization-Id', orgAId);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.length).toBeGreaterThanOrEqual(1);
+    const actions = res.body.data.map((l: any) => l.action);
+    expect(actions).toContain('VERIFICATION_EXECUTED');
+  });
+
+  it('20. Platform Admin System Overview: Global metrics and provider posture', async () => {
+    const adminTokenRes = await request(app)
+      .post('/api/v1/auth/login')
+      .send({
+        email: 'admin@garaa.internal',
+        password: 'Garaa@2026!'
+      });
+
+    const adminToken = adminTokenRes.body.data.token;
+
+    const overviewRes = await request(app)
+      .get('/api/v1/admin/overview')
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    expect(overviewRes.status).toBe(200);
+    expect(overviewRes.body.data.totalOrganizations).toBeGreaterThanOrEqual(2);
+    expect(overviewRes.body.data.providers.length).toBe(4);
+    // Unconfigured providers must be marked honest, never fabricated
+    expect(overviewRes.body.data.providers[0].status).toContain('UNCONFIGURED');
+  });
 });
+

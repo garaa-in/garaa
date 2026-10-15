@@ -26,8 +26,9 @@ export interface ReviewDecisionInput {
 
 export class VerificationService {
   private static generateRequestNumber(): string {
-    const random = Math.floor(1000 + Math.random() * 9000);
-    return `VR-2026-${random}`;
+    const ts = Date.now().toString(36).toUpperCase();
+    const rand = Math.floor(1000 + Math.random() * 9000);
+    return `VR-2026-${ts}-${rand}`;
   }
 
   private static generateCredentialId(): string {

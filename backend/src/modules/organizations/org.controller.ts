@@ -26,10 +26,11 @@ const updateRoleSchema = z.object({
   role: z.enum(['OWNER', 'ADMIN', 'MEMBER', 'REVIEWER'])
 });
 
-orgRouter.get('/current', async (req: Request, res: Response, next: NextFunction) => {
+orgRouter.get(['/current', '/me'], async (req: Request, res: Response, next: NextFunction) => {
   try {
     const org = await OrgService.getOrgDetails(req.organizationId!);
-    res.json({ success: true, data: org });
+    const members = await OrgService.listMembers(req.organizationId!);
+    res.json({ success: true, data: { organization: org, members } });
   } catch (err) {
     next(err);
   }

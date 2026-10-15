@@ -120,6 +120,7 @@ apiRouter.use('/reports', reportRouter);
 apiRouter.use('/api-keys', apiKeyRouter);
 apiRouter.use('/webhooks', webhookRouter);
 apiRouter.use('/audit-logs', auditRouter);
+apiRouter.use('/audit', auditRouter);
 apiRouter.use('/admin', adminRouter);
 
 app.use('/api/v1', apiRouter);
