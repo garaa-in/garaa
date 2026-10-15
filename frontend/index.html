@@ -1460,7 +1460,7 @@ function ProfileMenu({ setView, profile, pushToast }) {
         )
       ),
       h("div", { className: "mt-4 pt-3 border-t border-slate-100 text-xs text-slate-500 flex justify-between items-center" },
-        h("span", null, "Created by ", h("span", { className: "font-bold text-[#0B1220]" }, "team Mudra")),
+        h("span", null, "Created by ", h("span", { className: "font-bold text-[#0B1220]" }, "PARTH")),
         h("a", { href: "/api/v1/docs", target: "_blank", rel: "noreferrer", className: "text-[11px] font-bold text-indigo-600 hover:underline" }, "Swagger Docs")
       )
     ),
@@ -4609,7 +4609,7 @@ function AdminParthDatabaseVault({ pushToast }) {
       loadRecords();
       if (pushToast) pushToast("👑 Access Granted: Welcome Admin Parth to Scanned Documents Database");
     } else {
-      setError("Incorrect password! Access is restricted to Admin Parth only (garaa916).");
+      setError("Incorrect password. Please try again.");
     }
   };
 
@@ -4681,11 +4681,8 @@ function AdminParthDatabaseVault({ pushToast }) {
             h(Icon, { name: "Lock", size: 22 })
           ),
           h("div", null,
-            h("div", { className: "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-amber-500/10 text-amber-500 border border-amber-500/20" },
-              "🔒 Admin Parth Access Only"
-            ),
-            h("h2", { style: disp, className: "font-bold text-[#0B1220] text-xl mt-1.5 flex items-center gap-2" },
-              "Admin Parth Scanned Documents Vault"
+            h("h2", { style: disp, className: "font-bold text-[#0B1220] text-xl flex items-center gap-2" },
+              "Admin Scanned Documents Vault"
             ),
             h("p", { className: "text-sm text-slate-400 mt-1 max-w-xl leading-relaxed" },
               "Private surveillance database recording every document and photo scanned by anyone across Garaa. Stores captured images, detected subject names, and real-time validity checks."
@@ -4719,15 +4716,7 @@ function AdminParthDatabaseVault({ pushToast }) {
         )
       ),
 
-      !unlocked ? h("div", { className: "mt-5 rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-amber-800" },
-        h("div", { className: "flex items-center gap-2.5" },
-          h(Icon, { name: "ShieldAlert", size: 18, className: "text-amber-600 shrink-0" }),
-          h("span", null, "Restricted administrative zone. Password authentication is strictly required.")
-        ),
-        h("span", { className: "font-mono font-bold text-[11px] bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20 text-amber-700" },
-          "AUTH: garaa916"
-        )
-      ) : h("div", { className: "mt-6 space-y-6 fade-in" },
+      unlocked && h("div", { className: "mt-6 space-y-6 fade-in" },
         // Unlocked Header banner
         h("div", { className: "rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs" },
           h("div", { className: "flex items-center gap-2.5" },
@@ -4897,10 +4886,10 @@ function AdminParthDatabaseVault({ pushToast }) {
             h(Icon, { name: "Lock", size: 22 })
           ),
           h("div", null,
-            h("div", { className: "text-[10px] uppercase tracking-wider font-extrabold text-amber-600" }, "Admin Parth Security Authentication"),
+            h("div", { className: "text-[10px] uppercase tracking-wider font-extrabold text-amber-600" }, "Security Authentication"),
             h("h3", { style: disp, className: "font-bold text-xl text-[#0B1220]" }, "Unlock Scanned Database"),
             h("p", { className: "text-xs text-slate-500 mt-1 leading-relaxed" },
-              "Enter the admin password (garaa916) to access the surveillance records and saved document photos."
+              "Enter the master password to access the surveillance records and saved document photos."
             )
           )
         ),
@@ -4912,7 +4901,7 @@ function AdminParthDatabaseVault({ pushToast }) {
               autoFocus: true,
               value: password,
               onChange: (e) => setPassword(e.target.value),
-              placeholder: "Enter password (garaa916)",
+              placeholder: "Enter password",
               className: "w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-[#0B1220] outline-none focus:border-[var(--acc-1)] focus:ring-2 focus:ring-[var(--acc-1)]/20 transition-all font-mono"
             })
           ),
