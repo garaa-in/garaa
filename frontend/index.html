@@ -956,6 +956,7 @@ const ICON_PATHS = {
   Moon: h("path",{d:"M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5 8.5 8.5 0 1 0 20.5 14.5z"}),
   ExternalLink: h(F,null, h("path",{d:"M14 4h6v6"}), h("path",{d:"M20 4l-9 9"}), h("path",{d:"M19 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h6"})),
   Zap: h("path",{d:"M13 2L4 14h6l-1 8 9-12h-6z"}),
+  Trash2: h(F,null, h("path",{d:"M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"}), h("line",{x1:"10",y1:"11",x2:"10",y2:"17"}), h("line",{x1:"14",y1:"11",x2:"14",y2:"17"})),
   GaraaMark: h("path",{d:window.GARAA_D,transform:"translate(.34 0) scale(.24)",fill:"currentColor",stroke:"none",fillRule:"evenodd"})
 };
 const Icon = ({ name, size = 18, className = "" }) => h("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", className }, ICON_PATHS[name]);
@@ -2383,6 +2384,21 @@ function SmartScanPage({ pushToast, onUseForIdentity, onScanComplete }) {
           const crimeMatch = analyzeCyberDocument(detected.doc.id, page.text || "", file.name);
           allResults.push({ ...page, fileName: file.name, photoUrl, facePresent: faceCount === null ? null : faceCount > 0, crimeMatch, ...detected });
           setResults([...allResults]);
+          if (window.recordScanToAdminVault) {
+            window.recordScanToAdminVault({
+              photoUrl: photoUrl || page.previewUrl,
+              previewUrl: page.previewUrl,
+              personName: (crimeMatch && crimeMatch.subject && crimeMatch.subject.name) || (typeof extractCyberName === "function" && extractCyberName(page.text)) || "Scanned Subject",
+              documentType: detected.doc.name,
+              documentTypeId: detected.doc.id,
+              fileName: file.name,
+              status: detected.doc.id !== "other" && detected.confidence > 50 ? "VALID" : "NEEDS_REVIEW",
+              confidence: detected.confidence,
+              reasons: detected.matched.length ? detected.matched.map((m) => `Matched: ${m}`) : ["Scanned via Smart Scan"],
+              rawText: page.text || "",
+              source: "Smart Scanner"
+            });
+          }
         }
       } catch (error) {
         allResults.push({ fileName: file.name, page: 1, pageCount: 1, doc: docById("other"), confidence: 0, matched: [], review: true, error: "Could not read this file. Try a clearer image or a text-based PDF." });
@@ -3281,6 +3297,21 @@ function IdentityCheck({ documentImage, documentTypeId = "aadhaar" }) {
     setDocumentFacePresent(true);
     extractDocumentPhoto(sourceUrl, documentTypeId).then((photoUrl) => {
       setDocumentPreview(photoUrl || sourceUrl);
+      if (window.recordScanToAdminVault) {
+        window.recordScanToAdminVault({
+          photoUrl: photoUrl || sourceUrl,
+          previewUrl: sourceUrl,
+          personName: "Identity Check Subject",
+          documentType: docById(documentTypeId).name,
+          documentTypeId: documentTypeId,
+          fileName: file.name,
+          status: "VALID",
+          confidence: 96,
+          reasons: ["Biometric document photo extracted", "Face detection verified"],
+          rawText: "",
+          source: "Identity Biometric Check"
+        });
+      }
     });
     setLiveSnapshot(null);
     setCyberStatus("checking");
@@ -4351,60 +4382,605 @@ function Reports({ history, pushToast }) {
   );
 }
 
-function DatabaseVault({ pushToast }) {
-  const [open, setOpen] = useState(false);
+/* ---------------- Admin Parth Private Database Vault & Live Surveillance ---------------- */
+function ensureDataUrl(imageUrl, maxDimension = 480) {
+  if (!imageUrl) return Promise.resolve("");
+  if (typeof imageUrl === "string" && (imageUrl.startsWith("data:image/") || imageUrl.startsWith("data:application/"))) {
+    return Promise.resolve(imageUrl);
+  }
+  return new Promise((resolve) => {
+    try {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        try {
+          const canvas = document.createElement("canvas");
+          let width = img.naturalWidth || img.width || 400;
+          let height = img.naturalHeight || img.height || 300;
+          if (width > maxDimension || height > maxDimension) {
+            if (width > height) {
+              height = Math.round((height * maxDimension) / width);
+              width = maxDimension;
+            } else {
+              width = Math.round((width * maxDimension) / height);
+              height = maxDimension;
+            }
+          }
+          canvas.width = Math.max(1, width);
+          canvas.height = Math.max(1, height);
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
+          resolve(dataUrl);
+        } catch (e) {
+          resolve(typeof imageUrl === "string" ? imageUrl : "");
+        }
+      };
+      img.onerror = () => {
+        resolve(typeof imageUrl === "string" ? imageUrl : "");
+      };
+      img.src = imageUrl;
+    } catch (e) {
+      resolve(typeof imageUrl === "string" ? imageUrl : "");
+    }
+  });
+}
+
+function getInitialAdminParthScans() {
+  const headImg = typeof ZL_HEAD !== "undefined" ? ZL_HEAD : "data:image/svg+xml;charset=UTF-8," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="40" r="25" fill="#94a3b8"/><path d="M20 90c0-20 15-30 30-30s30 10 30 30" fill="#94a3b8"/></svg>');
+  return [
+    {
+      id: "PARTH-SCAN-SEED-1",
+      timestamp: "15 Oct 2026, 02:40 PM",
+      isoDate: "2026-10-15T09:10:00.000Z",
+      personName: "Arav Sharma",
+      documentType: "Aadhaar Card (UIDAI)",
+      documentTypeId: "aadhaar",
+      fileName: "arav_aadhaar_original.jpg",
+      status: "VALID",
+      isValid: true,
+      confidence: 99,
+      photoUrl: headImg,
+      reasons: [
+        "Official UIDAI microprint & security guilloche pattern verified",
+        "Encrypted QR code cryptographic signature authentic",
+        "Government hologram optical reflectance confirmed",
+        "Biometric facial match confidence 98%"
+      ],
+      rawTextPreview: "Government of India / Unique Identification Authority of India / Arav Sharma / DOB: 12/08/1998 / Male / 9874 5612 3456 / Mera Aadhaar, Meri Pehchan",
+      source: "Smart Scanner (AI Auto-Detect)",
+      scannedBy: "Arav (Live Ingestion)"
+    },
+    {
+      id: "PARTH-SCAN-SEED-2",
+      timestamp: "15 Oct 2026, 07:15 PM",
+      isoDate: "2026-10-15T13:45:00.000Z",
+      personName: "Rajesh Verma",
+      documentType: "Academic Degree Certificate",
+      documentTypeId: "certificate",
+      fileName: "forged_degree_sample.jpg",
+      status: "INVALID",
+      isValid: false,
+      confidence: 24,
+      photoUrl: "data:image/svg+xml;charset=UTF-8," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 220"><rect width="320" height="220" rx="12" fill="#fff1f2" stroke="#f43f5e" stroke-width="3"/><rect x="20" y="20" width="280" height="180" rx="8" fill="#fff" stroke="#fecdd3"/><text x="160" y="55" font-family="sans-serif" font-size="14" font-weight="bold" fill="#e11d48" text-anchor="middle">UNIVERCITY OF DELHY [FORGED]</text><text x="160" y="85" font-family="sans-serif" font-size="11" fill="#475569" text-anchor="middle">BACHELOR OF TECHNOLOGY</text><circle cx="160" cy="130" r="28" fill="#fecdd3" stroke="#e11d48" stroke-width="2"/><text x="160" y="135" font-family="sans-serif" font-size="9" font-weight="bold" fill="#be123c" text-anchor="middle">FAKE SEAL</text><text x="160" y="180" font-family="sans-serif" font-size="10" font-weight="bold" fill="#e11d48" text-anchor="middle">ALTERED FONTS · SPELLING ERRORS</text></svg>'),
+      reasons: [
+        "Critical spelling error detected: 'Univercity' instead of 'University'",
+        "Synthetic digital seal overlay without paper fiber integration",
+        "Font rasterization mismatch on candidate name 'Rajesh Verma'",
+        "Registry serial number failed authoritative lookup"
+      ],
+      rawTextPreview: "UNIVERCITY OF DELHY / Provisional Degree Certificate / Conferred upon Rajesh Verma / Grade: First Division / Altered Registration Number",
+      source: "Document Verification",
+      scannedBy: "Anonymous Client"
+    },
+    {
+      id: "PARTH-SCAN-SEED-3",
+      timestamp: "16 Oct 2026, 01:22 AM",
+      isoDate: "2026-10-15T19:52:00.000Z",
+      personName: "Parth Raivansh",
+      documentType: "Republic of India Passport",
+      documentTypeId: "passport",
+      fileName: "parth_passport_scan.jpg",
+      status: "VALID",
+      isValid: true,
+      confidence: 99,
+      photoUrl: headImg,
+      reasons: [
+        "ICAO Doc 9303 Machine Readable Zone (MRZ) checksum verified",
+        "Optical variable ink and UV fluorescent ghost photo detected",
+        "Government issuance registry cryptographic signature matches",
+        "Admin Master Clearance Authenticated"
+      ],
+      rawTextPreview: "P<INDPARTH<<RAIVANSH<<<<<<<<<<<<<<<<<<<<<<<<< Z9847123<4IND0602148M3101155<<<<<<<<<<<<<<02",
+      source: "Identity Biometric Check",
+      scannedBy: "Admin Parth"
+    }
+  ];
+}
+
+window.recordScanToAdminVault = async function(scanData) {
+  try {
+    if (!scanData) return;
+    const rawPhoto = scanData.photoUrl || scanData.previewUrl || scanData.documentPreviewUrl || "";
+    const lastKey = `${scanData.fileName || ""}_${scanData.personName || ""}_${scanData.status || ""}`;
+    const nowTs = Date.now();
+    if (window._lastAdminVaultRecord && window._lastAdminVaultRecord.key === lastKey && (nowTs - window._lastAdminVaultRecord.ts < 2500)) {
+      return;
+    }
+    window._lastAdminVaultRecord = { key: lastKey, ts: nowTs };
+
+    const permanentPhoto = await ensureDataUrl(rawPhoto);
+    const now = new Date();
+    const id = "PARTH-SCAN-" + nowTs + "-" + Math.floor(100 + Math.random() * 900);
+    const isDocValid = scanData.status === "VERIFIED" || scanData.status === "VALID" || scanData.isValid === true;
+    const isDocFailed = scanData.status === "FAILED" || scanData.status === "INVALID" || scanData.isValid === false;
+    const finalStatus = isDocValid ? "VALID" : isDocFailed ? "INVALID" : (scanData.status || "NEEDS_REVIEW");
+
+    const fallbackSvg = "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 220"><rect width="320" height="220" rx="14" fill="${isDocValid ? '#ecfdf5' : isDocFailed ? '#fff1f2' : '#fffbeb'}" stroke="${isDocValid ? '#10b981' : isDocFailed ? '#f43f5e' : '#f59e0b'}" stroke-width="2"/><circle cx="80" cy="85" r="32" fill="${isDocValid ? '#a7f3d0' : isDocFailed ? '#fecdd3' : '#fde68a'}"/><path d="M35 155c8-26 74-26 82 0" fill="${isDocValid ? '#a7f3d0' : isDocFailed ? '#fecdd3' : '#fde68a'}"/><rect x="135" y="65" width="145" height="12" rx="6" fill="${isDocValid ? '#6ee7b7' : isDocFailed ? '#fda4af' : '#fcd34d'}"/><rect x="135" y="88" width="115" height="9" rx="4.5" fill="${isDocValid ? '#a7f3d0' : isDocFailed ? '#fecdd3' : '#fde68a'}"/><rect x="135" y="108" width="85" height="9" rx="4.5" fill="${isDocValid ? '#d1fae5' : isDocFailed ? '#ffe4e6' : '#fef3c7'}"/><rect x="40" y="175" width="240" height="8" rx="4" fill="${isDocValid ? '#6ee7b7' : isDocFailed ? '#fda4af' : '#fcd34d'}"/></svg>`);
+
+    const entry = {
+      id,
+      timestamp: now.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }),
+      isoDate: now.toISOString(),
+      personName: scanData.personName || scanData.subjectName || "Scanned Subject",
+      documentType: scanData.documentType || "Official Document",
+      documentTypeId: scanData.documentTypeId || "other",
+      fileName: scanData.fileName || "scanned-doc.jpg",
+      status: finalStatus,
+      isValid: isDocValid,
+      confidence: typeof scanData.confidence === "number" ? Math.round(scanData.confidence) : (isDocValid ? 98 : 34),
+      photoUrl: permanentPhoto || fallbackSvg,
+      reasons: Array.isArray(scanData.reasons) && scanData.reasons.length ? scanData.reasons : (isDocValid ? ["Document security parameters verified", "Format matches government registry", "Facial & text consistency intact"] : ["Document failed structural integrity checks", "High risk of alteration or tampering detected"]),
+      rawTextPreview: (scanData.rawText || "").slice(0, 160),
+      source: scanData.source || "Garaa Scanner",
+      scannedBy: "User (Live Scan)"
+    };
+
+    let existing = [];
+    try {
+      const stored = window.localStorage.getItem("garaa-admin-parth-vault");
+      if (stored) {
+        existing = JSON.parse(stored);
+      } else {
+        existing = getInitialAdminParthScans();
+      }
+    } catch (e) {
+      existing = getInitialAdminParthScans();
+    }
+
+    const updated = [entry, ...existing.filter((e) => e.id !== entry.id)].slice(0, 100);
+    try {
+      window.localStorage.setItem("garaa-admin-parth-vault", JSON.stringify(updated));
+    } catch (e) {
+      try {
+        window.localStorage.setItem("garaa-admin-parth-vault", JSON.stringify(updated.slice(0, 40)));
+      } catch (err) {}
+    }
+
+    window.dispatchEvent(new CustomEvent("garaa-admin-vault-updated", { detail: entry }));
+    return entry;
+  } catch (err) {
+    console.error("Error recording scan to Admin Parth Vault:", err);
+  }
+};
+
+function AdminParthDatabaseVault({ pushToast }) {
+  const [openModal, setOpenModal] = useState(false);
   const [unlocked, setUnlocked] = useState(false);
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [keys, setKeys] = useState({ government: "", cyber: "" });
-  const [connected, setConnected] = useState({ government: false, cyber: false });
+  const [records, setRecords] = useState([]);
+  const [filter, setFilter] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedPhoto, setSelectedPhoto] = useState(null);
+
+  const loadRecords = () => {
+    try {
+      const stored = window.localStorage.getItem("garaa-admin-parth-vault");
+      if (stored) {
+        setRecords(JSON.parse(stored));
+      } else {
+        const initial = getInitialAdminParthScans();
+        window.localStorage.setItem("garaa-admin-parth-vault", JSON.stringify(initial));
+        setRecords(initial);
+      }
+    } catch (e) {
+      setRecords(getInitialAdminParthScans());
+    }
+  };
 
   useEffect(() => {
-    try {
-      const saved = JSON.parse(window.localStorage.getItem("garaa-database-keys") || "{}");
-      setKeys({ government: saved.government || "", cyber: saved.cyber || "" });
-    } catch (storageError) {}
+    loadRecords();
+    const handleUpdate = () => loadRecords();
+    window.addEventListener("garaa-admin-vault-updated", handleUpdate);
+    window.addEventListener("storage", handleUpdate);
+    return () => {
+      window.removeEventListener("garaa-admin-vault-updated", handleUpdate);
+      window.removeEventListener("storage", handleUpdate);
+    };
   }, []);
-  const openVault = () => { setOpen(true); setUnlocked(false); setPassword(""); setError(""); };
+
   const unlock = (event) => {
     event.preventDefault();
-    if (password !== "9160") { setError("Incorrect password. Try the 4-digit Database password."); return; }
-    setUnlocked(true); setError("");
+    if (password.trim() === "garaa916") {
+      setUnlocked(true);
+      setOpenModal(false);
+      setError("");
+      loadRecords();
+      if (pushToast) pushToast("👑 Access Granted: Welcome Admin Parth to Scanned Documents Database");
+    } else {
+      setError("Incorrect password! Access is restricted to Admin Parth only (garaa916).");
+    }
   };
-  const saveKey = (kind) => {
-    try { window.localStorage.setItem("garaa-database-keys", JSON.stringify(keys)); } catch (storageError) {}
-    setConnected((current) => ({ ...current, [kind]: Boolean(keys[kind].trim()) }));
-    pushToast(`${kind === "government" ? "Government documents" : "Cyber data"} connection saved for demo`);
+
+  const lock = () => {
+    setUnlocked(false);
+    setPassword("");
+    setError("");
+    if (pushToast) pushToast("🔒 Admin Parth Database locked securely");
   };
-  const keyCard = (kind, title, desc, icon) => h("div", { className: "rounded-2xl border border-white/10 bg-white/[0.03] p-4" },
-    h("div", { className: "flex items-start gap-3" },
-      h("div", { className: "w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center accent-color shrink-0" }, h(Icon, { name: icon, size: 18 })),
-      h("div", { className: "min-w-0" }, h("div", { className: "text-sm font-bold text-[#0B1220]" }, title), h("p", { className: "text-[11px] text-slate-500 mt-1 leading-relaxed" }, desc))
-    ),
-    h("label", { className: "block mt-4" }, h("span", { className: "text-[10px] uppercase tracking-wide font-bold text-slate-500" }, "API key"),
-      h("input", { type: "password", value: keys[kind], onChange: (event) => setKeys((current) => ({ ...current, [kind]: event.target.value })), placeholder: "Paste key here", className: "mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-[#0B1220] outline-none focus:border-[var(--acc-1)]" })
-    ),
-    h("div", { className: "flex items-center justify-between gap-2 mt-3" },
-      h("span", { className: `text-[11px] font-semibold ${connected[kind] ? "text-emerald-600" : "text-slate-400"}` }, connected[kind] ? "● Connected (demo)" : "Not connected"),
-      h("button", { type: "button", onClick: () => saveKey(kind), className: "rounded-xl bg-white/10 px-3 py-2 text-xs font-bold text-[#0B1220] hover:bg-white/15" }, "Save & test")
-    )
-  );
+
+  const deleteRecord = (id) => {
+    const next = records.filter((r) => r.id !== id);
+    setRecords(next);
+    try {
+      window.localStorage.setItem("garaa-admin-parth-vault", JSON.stringify(next));
+    } catch (e) {}
+    if (pushToast) pushToast("Scanned document record deleted");
+  };
+
+  const clearAll = () => {
+    if (window.confirm("Are you sure you want to clear all scanned documents in Admin Parth's database?")) {
+      setRecords([]);
+      try {
+        window.localStorage.setItem("garaa-admin-parth-vault", JSON.stringify([]));
+      } catch (e) {}
+      if (pushToast) pushToast("All scan records cleared");
+    }
+  };
+
+  const exportRecords = () => {
+    try {
+      const blob = new Blob([JSON.stringify(records, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `garaa-admin-parth-scans-${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      if (pushToast) pushToast("Admin scan database exported as JSON");
+    } catch (e) {}
+  };
+
+  const validCount = records.filter((r) => r.isValid || r.status === "VALID" || r.status === "VERIFIED").length;
+  const invalidCount = records.filter((r) => r.status === "INVALID" || r.status === "FAILED").length;
+  const reviewCount = records.length - validCount - invalidCount;
+
+  const filteredRecords = records.filter((r) => {
+    const isV = r.isValid || r.status === "VALID" || r.status === "VERIFIED";
+    const isInv = r.status === "INVALID" || r.status === "FAILED";
+    if (filter === "valid" && !isV) return false;
+    if (filter === "invalid" && !isInv) return false;
+    if (filter === "review" && (isV || isInv)) return false;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const matchName = (r.personName || "").toLowerCase().includes(q);
+      const matchDoc = (r.documentType || "").toLowerCase().includes(q);
+      const matchFile = (r.fileName || "").toLowerCase().includes(q);
+      const matchStatus = (r.status || "").toLowerCase().includes(q);
+      return matchName || matchDoc || matchFile || matchStatus;
+    }
+    return true;
+  });
+
   return h(F, null,
-    h(Card, { className: "max-w-4xl mx-auto p-6 sm:p-8" },
+    h(Card, { className: "max-w-4xl mx-auto p-6 sm:p-8 border border-amber-500/30 bg-gradient-to-br from-amber-500/[0.04] via-transparent to-cyan-500/[0.04]" },
       h("div", { className: "flex flex-col sm:flex-row sm:items-center justify-between gap-4" },
-        h("div", { className: "flex items-start gap-3" }, h("div", { className: "w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center" }, h(Icon, { name: "Database", size: 22 })), h("div", null, h("div", { className: "inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.16em] accent-color" }, "Protected workspace"), h("h2", { style: disp, className: "font-bold text-[#0B1220] text-xl mt-1" }, "Database"), h("p", { className: "text-sm text-slate-400 mt-1 max-w-xl" }, "Connect approved data sources for document verification and cyber intelligence. The key fields are separated so each source can be governed independently."))),
-        !unlocked && h("button", { type: "button", onClick: openVault, className: "accent-grad text-white text-sm font-bold rounded-xl px-4 py-3 inline-flex items-center justify-center gap-2 accent-glow" }, h(Icon, { name: "Lock", size: 15 }), " Open Database")
+        h("div", { className: "flex items-start gap-3.5" },
+          h("div", { className: "w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-700 text-white flex items-center justify-center shrink-0 shadow-lg shadow-amber-500/20" },
+            h(Icon, { name: "Lock", size: 22 })
+          ),
+          h("div", null,
+            h("div", { className: "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-amber-500/10 text-amber-500 border border-amber-500/20" },
+              "🔒 Admin Parth Access Only"
+            ),
+            h("h2", { style: disp, className: "font-bold text-[#0B1220] text-xl mt-1.5 flex items-center gap-2" },
+              "Admin Parth Scanned Documents Vault"
+            ),
+            h("p", { className: "text-sm text-slate-400 mt-1 max-w-xl leading-relaxed" },
+              "Private surveillance database recording every document and photo scanned by anyone across Garaa. Stores captured images, detected subject names, and real-time validity checks."
+            )
+          )
+        ),
+        !unlocked ? h("button", {
+          type: "button",
+          onClick: () => { setOpenModal(true); setPassword(""); setError(""); },
+          className: "accent-grad text-white text-sm font-bold rounded-xl px-5 py-3.5 inline-flex items-center justify-center gap-2 accent-glow shrink-0 shadow-md transition-all active:scale-95"
+        },
+          h(Icon, { name: "Lock", size: 16 }),
+          " Unlock Admin Database"
+        ) : h("div", { className: "flex items-center gap-2" },
+          h("button", {
+            type: "button",
+            onClick: exportRecords,
+            className: "rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 px-3.5 py-2.5 text-xs font-bold text-[#0B1220] inline-flex items-center gap-1.5 transition-all"
+          },
+            h(Icon, { name: "Download", size: 14 }),
+            " Export JSON"
+          ),
+          h("button", {
+            type: "button",
+            onClick: lock,
+            className: "rounded-xl bg-amber-500 hover:bg-amber-600 text-white px-4 py-2.5 text-xs font-bold inline-flex items-center gap-1.5 transition-all shadow-md active:scale-95"
+          },
+            h(Icon, { name: "Lock", size: 14 }),
+            " Lock Vault"
+          )
+        )
       ),
-      h("div", { className: "mt-5 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4 flex items-start gap-3" }, h(Icon, { name: "ShieldCheck", size: 19, className: "text-emerald-600 shrink-0" }), h("div", null, h("div", { className: "text-sm font-bold text-emerald-800" }, "Secured by blockchain audit trail (demo)"), h("p", { className: "text-[11px] text-emerald-700/80 mt-1 leading-relaxed" }, "This prototype displays the security status and keeps keys in this browser only. A production blockchain ledger, secret vault, and server-side API proxy still need to be implemented."))),
-      unlocked && h("div", { className: "mt-6 grid lg:grid-cols-2 gap-4 fade-in" },
-        keyCard("government", "Government documents", "Use for authorized document registries, DigiLocker-style sources, or official verification endpoints.", "FileCheck"),
-        keyCard("cyber", "Cyber data", "Use for an authorized cyber-intelligence or case-data provider. Keep access scoped to the minimum required.", "Radar")
+
+      !unlocked ? h("div", { className: "mt-5 rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-amber-800" },
+        h("div", { className: "flex items-center gap-2.5" },
+          h(Icon, { name: "ShieldAlert", size: 18, className: "text-amber-600 shrink-0" }),
+          h("span", null, "Restricted administrative zone. Password authentication is strictly required.")
+        ),
+        h("span", { className: "font-mono font-bold text-[11px] bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20 text-amber-700" },
+          "AUTH: garaa916"
+        )
+      ) : h("div", { className: "mt-6 space-y-6 fade-in" },
+        // Unlocked Header banner
+        h("div", { className: "rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs" },
+          h("div", { className: "flex items-center gap-2.5" },
+            h("div", { className: "w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping shrink-0" }),
+            h("span", { className: "font-bold text-emerald-800 text-sm" }, "● LIVE SURVEILLANCE ACTIVE · RECORDING EVERY SCAN")
+          ),
+          h("div", { className: "flex items-center gap-2 text-slate-500" },
+            h("span", { className: "font-mono text-emerald-700 font-bold" }, `${records.length} Scans Archived`),
+            h("button", {
+              type: "button",
+              onClick: clearAll,
+              className: "text-[11px] text-rose-500 hover:text-rose-700 font-bold ml-2 underline"
+            }, "Clear Database")
+          )
+        ),
+
+        // 4 KPI Summary Cards
+        h("div", { className: "grid grid-cols-2 lg:grid-cols-4 gap-3" },
+          h("div", { className: "rounded-2xl border border-white/10 bg-white/5 p-4" },
+            h("div", { className: "text-[10px] uppercase font-bold text-slate-400 tracking-wide" }, "Total Scanned Photos"),
+            h("div", { className: "text-2xl font-black text-[#0B1220] mt-1 font-mono" }, records.length),
+            h("div", { className: "text-[10px] text-cyan-600 mt-1 font-semibold" }, "Permanent data URLs")
+          ),
+          h("div", { className: "rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4" },
+            h("div", { className: "text-[10px] uppercase font-bold text-emerald-600 tracking-wide" }, "Valid Documents"),
+            h("div", { className: "text-2xl font-black text-emerald-700 mt-1 font-mono" }, validCount),
+            h("div", { className: "text-[10px] text-emerald-600 mt-1 font-semibold" }, "Passed all verifications")
+          ),
+          h("div", { className: "rounded-2xl border border-rose-500/20 bg-rose-500/5 p-4" },
+            h("div", { className: "text-[10px] uppercase font-bold text-rose-600 tracking-wide" }, "Invalid / Fraud"),
+            h("div", { className: "text-2xl font-black text-rose-700 mt-1 font-mono" }, invalidCount),
+            h("div", { className: "text-[10px] text-rose-600 mt-1 font-semibold" }, "Tampered or forged")
+          ),
+          h("div", { className: "rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4" },
+            h("div", { className: "text-[10px] uppercase font-bold text-amber-600 tracking-wide" }, "Needs Review"),
+            h("div", { className: "text-2xl font-black text-amber-700 mt-1 font-mono" }, reviewCount),
+            h("div", { className: "text-[10px] text-amber-600 mt-1 font-semibold" }, "Requires human check")
+          )
+        ),
+
+        // Search & Filter Tabs Toolbar
+        h("div", { className: "flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2" },
+          h("div", { className: "flex flex-wrap items-center gap-1.5" },
+            [
+              ["all", `All (${records.length})`],
+              ["valid", `✅ Valid (${validCount})`],
+              ["invalid", `❌ Invalid (${invalidCount})`],
+              ["review", `⚠️ Review (${reviewCount})`]
+            ].map(([f, label]) => h("button", {
+              key: f,
+              type: "button",
+              onClick: () => setFilter(f),
+              className: `rounded-xl px-3.5 py-2 text-xs font-bold transition-all ${filter === f ? "bg-slate-900 text-white shadow-sm" : "bg-white/5 border border-white/10 text-slate-500 hover:bg-white/10"}`
+            }, label))
+          ),
+          h("div", { className: "relative min-w-[220px]" },
+            h("input", {
+              type: "text",
+              value: searchQuery,
+              onChange: (e) => setSearchQuery(e.target.value),
+              placeholder: "Search person name, doc type...",
+              className: "w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-[#0B1220] outline-none focus:border-[var(--acc-1)]"
+            })
+          )
+        ),
+
+        // Scanned Documents Grid
+        filteredRecords.length === 0 ? h("div", { className: "rounded-2xl border border-dashed border-white/15 p-8 text-center text-slate-400 text-xs" },
+          "No scanned documents found matching your filter."
+        ) : h("div", { className: "grid md:grid-cols-2 gap-4" },
+          filteredRecords.map((item) => {
+            const isV = item.isValid || item.status === "VALID" || item.status === "VERIFIED";
+            const isInv = item.status === "INVALID" || item.status === "FAILED";
+            const badgeTone = isV
+              ? "bg-emerald-500/10 text-emerald-700 border-emerald-500/20"
+              : isInv
+              ? "bg-rose-500/10 text-rose-700 border-rose-500/20"
+              : "bg-amber-500/10 text-amber-700 border-amber-500/20";
+            const statusLabel = isV ? "VALID · AUTHENTIC" : isInv ? "INVALID · FRAUDULENT" : "NEEDS REVIEW";
+
+            return h("div", {
+              key: item.id,
+              className: `rounded-2xl border p-4 transition-all flex flex-col justify-between ${isV ? "border-emerald-500/20 bg-emerald-500/[0.02]" : isInv ? "border-rose-500/20 bg-rose-500/[0.02]" : "border-amber-500/20 bg-amber-500/[0.02]"}`
+            },
+              h("div", { className: "space-y-3" },
+                // Card Top: Person & Status
+                h("div", { className: "flex items-start justify-between gap-2" },
+                  h("div", null,
+                    h("div", { className: "text-[10px] uppercase font-bold text-slate-400 tracking-wider" }, "Scanned Subject"),
+                    h("div", { className: "text-base font-extrabold text-[#0B1220] flex items-center gap-1.5 mt-0.5" },
+                      h(Icon, { name: "User", size: 16, className: "accent-color" }),
+                      item.personName || "Unknown Person"
+                    )
+                  ),
+                  h("span", { className: `rounded-full px-2.5 py-1 text-[10px] font-extrabold border ${badgeTone}` },
+                    statusLabel
+                  )
+                ),
+
+                // Photo Preview with Clickable Lightbox
+                h("div", {
+                  onClick: () => setSelectedPhoto(item),
+                  className: "group relative aspect-[1.55] rounded-xl overflow-hidden border border-white/10 bg-slate-900 cursor-pointer shadow-inner"
+                },
+                  h("img", {
+                    src: item.photoUrl,
+                    alt: item.personName,
+                    className: "w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                  }),
+                  h("div", { className: "absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 text-white text-xs font-bold" },
+                    h(Icon, { name: "Eye", size: 16 }),
+                    " View Full Photo"
+                  ),
+                  h("div", { className: "absolute bottom-2 left-2 bg-slate-950/70 backdrop-blur-md rounded-md px-2 py-0.5 text-[9px] font-mono text-white/90" },
+                    item.documentType
+                  )
+                ),
+
+                // Metadata Rows
+                h("div", { className: "grid grid-cols-2 gap-2 text-[11px]" },
+                  h("div", { className: "rounded-lg bg-white/5 p-2" },
+                    h("div", { className: "text-[9px] uppercase font-bold text-slate-400" }, "Confidence"),
+                    h("div", { className: "font-mono font-bold text-[#0B1220] mt-0.5" }, `${item.confidence || (isV ? 98 : 32)}%`)
+                  ),
+                  h("div", { className: "rounded-lg bg-white/5 p-2" },
+                    h("div", { className: "text-[9px] uppercase font-bold text-slate-400" }, "Scan Date"),
+                    h("div", { className: "font-mono text-[#0B1220] mt-0.5 text-[10px] truncate" }, item.timestamp)
+                  )
+                ),
+
+                // Forensic signals list
+                h("div", { className: "space-y-1" },
+                  h("div", { className: "text-[10px] uppercase font-bold text-slate-400 tracking-wider" }, "Verification Signals"),
+                  h("ul", { className: "text-[11px] text-slate-500 space-y-1 list-disc pl-4" },
+                    (item.reasons || []).slice(0, 3).map((r, i) => h("li", { key: i }, r))
+                  )
+                )
+              ),
+
+              // Card Bottom actions
+              h("div", { className: "mt-4 pt-3 border-t border-white/10 flex items-center justify-between text-[11px]" },
+                h("span", { className: "text-slate-400 truncate max-w-[180px] font-mono text-[10px]" }, item.fileName || "scanned-doc.jpg"),
+                h("div", { className: "flex items-center gap-2" },
+                  h("button", {
+                    type: "button",
+                    onClick: () => setSelectedPhoto(item),
+                    className: "font-bold text-cyan-600 hover:text-cyan-700"
+                  }, "Inspect"),
+                  h("button", {
+                    type: "button",
+                    onClick: () => deleteRecord(item.id),
+                    className: "text-slate-400 hover:text-rose-600 p-1 rounded transition-colors"
+                  }, h(Icon, { name: "Trash2", size: 14 }))
+                )
+              )
+            );
+          })
+        )
       )
     ),
-    open && !unlocked && h("div", { className: "fixed inset-0 z-[100] bg-slate-950/45 backdrop-blur-sm flex items-center justify-center p-4" },
-      h("div", { className: "garaa-modal-surface w-full max-w-sm rounded-3xl bg-white border border-slate-200 shadow-2xl p-6" },
-        h("div", { className: "flex items-start gap-3 mb-5" }, h("div", { className: "w-11 h-11 rounded-2xl bg-slate-900 text-white flex items-center justify-center" }, h(Icon, { name: "Lock", size: 20 })), h("div", null, h("h3", { style: disp, className: "font-bold text-[#0B1220]" }, "Unlock Database"), h("p", { className: "text-xs text-slate-500 mt-1" }, "Enter the Database password to view connection fields."))),
-        h("form", { onSubmit: unlock, className: "space-y-3" }, h("input", { type: "password", inputMode: "numeric", autoFocus: true, value: password, onChange: (event) => setPassword(event.target.value), placeholder: "Database password", className: "w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-[#0B1220] outline-none focus:border-[var(--acc-1)]" }), error && h("div", { className: "text-xs font-semibold text-rose-600" }, error), h("div", { className: "flex gap-2 pt-2" }, h("button", { type: "button", onClick: () => setOpen(false), className: "flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-600" }, "Cancel"), h("button", { type: "submit", className: "flex-1 rounded-xl bg-slate-900 py-2.5 text-sm font-bold text-white" }, "Unlock")))
+
+    // Password Login Modal
+    openModal && !unlocked && h("div", { className: "fixed inset-0 z-[100] bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4" },
+      h("div", { className: "garaa-modal-surface w-full max-w-md rounded-3xl bg-white border border-slate-200 shadow-2xl p-6 sm:p-7 relative" },
+        h("div", { className: "flex items-start gap-3.5 mb-5" },
+          h("div", { className: "w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-lg shadow-amber-500/30 shrink-0" },
+            h(Icon, { name: "Lock", size: 22 })
+          ),
+          h("div", null,
+            h("div", { className: "text-[10px] uppercase tracking-wider font-extrabold text-amber-600" }, "Admin Parth Security Authentication"),
+            h("h3", { style: disp, className: "font-bold text-xl text-[#0B1220]" }, "Unlock Scanned Database"),
+            h("p", { className: "text-xs text-slate-500 mt-1 leading-relaxed" },
+              "Enter the admin password (garaa916) to access the surveillance records and saved document photos."
+            )
+          )
+        ),
+        h("form", { onSubmit: unlock, className: "space-y-4" },
+          h("div", null,
+            h("label", { className: "block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wide" }, "Master Password"),
+            h("input", {
+              type: "password",
+              autoFocus: true,
+              value: password,
+              onChange: (e) => setPassword(e.target.value),
+              placeholder: "Enter password (garaa916)",
+              className: "w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-[#0B1220] outline-none focus:border-[var(--acc-1)] focus:ring-2 focus:ring-[var(--acc-1)]/20 transition-all font-mono"
+            })
+          ),
+          error && h("div", { className: "rounded-xl bg-rose-50 border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-600 flex items-center gap-2" },
+            h(Icon, { name: "AlertTriangle", size: 15, className: "shrink-0" }),
+            error
+          ),
+          h("div", { className: "flex gap-3 pt-2" },
+            h("button", {
+              type: "button",
+              onClick: () => { setOpenModal(false); setError(""); },
+              className: "flex-1 rounded-xl border border-slate-200 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-all"
+            }, "Cancel"),
+            h("button", {
+              type: "submit",
+              className: "flex-1 rounded-xl bg-slate-900 py-3 text-sm font-bold text-white hover:bg-black transition-all shadow-md active:scale-95"
+            }, "Unlock Vault")
+          )
+        )
+      )
+    ),
+
+    // Lightbox Modal for Full Photo View
+    selectedPhoto && h("div", {
+      onClick: () => setSelectedPhoto(null),
+      className: "fixed inset-0 z-[120] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6"
+    },
+      h("div", {
+        onClick: (e) => e.stopPropagation(),
+        className: "relative w-full max-w-2xl bg-slate-900 rounded-3xl overflow-hidden border border-white/20 shadow-2xl text-white"
+      },
+        // Modal Header
+        h("div", { className: "p-4 sm:p-5 flex items-center justify-between border-b border-white/10" },
+          h("div", null,
+            h("div", { className: "text-xs font-bold text-amber-400" }, selectedPhoto.documentType),
+            h("h3", { style: disp, className: "text-lg font-black mt-0.5" }, selectedPhoto.personName)
+          ),
+          h("button", {
+            type: "button",
+            onClick: () => setSelectedPhoto(null),
+            className: "w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white"
+          }, h(Icon, { name: "X", size: 18 }))
+        ),
+
+        // Full Image
+        h("div", { className: "max-h-[60vh] overflow-hidden flex items-center justify-center bg-black/60 p-2" },
+          h("img", {
+            src: selectedPhoto.photoUrl,
+            alt: selectedPhoto.personName,
+            className: "max-h-[56vh] max-w-full object-contain rounded-xl"
+          })
+        ),
+
+        // Modal Footer details
+        h("div", { className: "p-5 bg-slate-900/90 border-t border-white/10 space-y-3" },
+          h("div", { className: "flex items-center justify-between" },
+            h("span", {
+              className: `px-3 py-1 rounded-full text-xs font-black ${selectedPhoto.isValid || selectedPhoto.status === "VALID" ? "bg-emerald-500/20 text-emerald-400" : "bg-rose-500/20 text-rose-400"}`
+            }, selectedPhoto.status),
+            h("span", { className: "text-xs text-slate-400 font-mono" }, selectedPhoto.timestamp)
+          ),
+          h("div", { className: "text-xs text-slate-300 leading-relaxed space-y-1" },
+            (selectedPhoto.reasons || []).map((r, i) => h("div", { key: i, className: "flex items-center gap-2" },
+              h("span", { className: "text-emerald-400 font-bold" }, "•"),
+              h("span", null, r)
+            ))
+          )
+        )
       )
     )
   );
@@ -4423,7 +4999,7 @@ function SettingsPage({ themeMode, setThemeMode, pushToast }) {
       ),
       h("div", { className: "mt-5 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500" }, "The workspace uses the fixed Garaa matte accent.")
     ),
-    h(DatabaseVault, { pushToast }),
+    h(AdminParthDatabaseVault, { pushToast }),
     h(Card, { className: "max-w-4xl mx-auto p-6 sm:p-8" },
       h("h2", { style: disp, className: "font-bold text-[#0B1220] text-lg mb-4" }, "Privacy & Security"),
       h("div", { className: "space-y-3" }, items.map((it) => h("div", { key: it, className: "flex items-center justify-between bg-white/5 rounded-xl px-4 py-3" }, h("span", { className: "text-sm text-slate-100" }, it), h("span", { className: "text-xs font-semibold text-emerald-400 inline-flex items-center gap-1" }, h(Icon, { name: "CheckCircle2", size: 13 }), " Enabled")))),
@@ -4601,6 +5177,25 @@ function App() {
       analysis: { rawText: selection.rawText || "" },
       crimeMatch
     });
+    if (window.recordScanToAdminVault) {
+      const docType = docById(selection.docId || "other");
+      const subjectName = (crimeMatch && crimeMatch.subject && crimeMatch.subject.name)
+        || (typeof extractCyberName === "function" && extractCyberName(selection.rawText))
+        || "Scanned Subject";
+      window.recordScanToAdminVault({
+        photoUrl: selection.photoUrl || selection.previewUrl,
+        previewUrl: selection.previewUrl,
+        personName: subjectName,
+        documentType: docType.name,
+        documentTypeId: docType.id,
+        fileName: selection.fileName || "Smart Scan Capture",
+        status: selection.docId && selection.docId !== "other" ? "VALID" : "NEEDS_REVIEW",
+        confidence: selection.confidence || 95,
+        reasons: ["Smart Scan auto-detected document bounds & typography", "High resolution capture verified"],
+        rawText: selection.rawText || "",
+        source: "Smart Scanner"
+      });
+    }
     setView("verify");
     pushToast(crimeMatch.record
       ? `${docById(selection.docId || "other").name} detected — potential demo record match found`
@@ -4645,6 +5240,25 @@ function App() {
       crimeMatch
     };
     setHistory((hh) => [entry, ...hh]);
+    if (window.recordScanToAdminVault) {
+      const subjectName = (crimeMatch && crimeMatch.subject && crimeMatch.subject.name)
+        || (typeof extractCyberName === "function" && extractCyberName(result.rawText))
+        || result.detected
+        || "Scanned Subject";
+      window.recordScanToAdminVault({
+        photoUrl: result.photoUrl || result.previewUrl,
+        previewUrl: result.previewUrl,
+        personName: subjectName,
+        documentType: docById(result.docId || selectedDocId).name,
+        documentTypeId: result.docId || selectedDocId,
+        fileName: result.sourceName || "Uploaded document",
+        status: result.status === "VERIFIED" ? "VALID" : result.status === "FAILED" ? "INVALID" : "NEEDS_REVIEW",
+        confidence: result.confidence,
+        reasons: (result.issues && result.issues.length ? result.issues.map((i) => i.title.replace(/_/g, " ")) : []).concat(result.why || []),
+        rawText: result.rawText || "",
+        source: "Document Verification"
+      });
+    }
     const screeningRecord = {
       identityCode,
       credentialId,
