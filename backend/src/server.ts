@@ -7,8 +7,8 @@ async function startServer() {
     await prisma.$connect();
     console.log(`[DATABASE] Connected to database at: ${process.env.DATABASE_URL || 'dev.db'}`);
 
-    const server = app.listen(config.port, () => {
-      console.log(`[GARAA_API] Server listening on http://localhost:${config.port}`);
+    const server = app.listen(config.port, '0.0.0.0', () => {
+      console.log(`[GARAA_API] Server listening on http://0.0.0.0:${config.port} (Cross-Device LAN Ready)`);
       console.log(`[GARAA_DOCS] Swagger API documentation available at http://localhost:${config.port}/api/v1/docs`);
       console.log(`[HEALTH] Health check active at http://localhost:${config.port}/health`);
     });

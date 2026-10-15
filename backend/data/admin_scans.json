@@ -1,0 +1,85 @@
+[
+  {
+    "id": "PARTH-SCAN-SEED-3",
+    "timestamp": "16 Oct 2026, 01:22 AM",
+    "isoDate": "2026-10-15T19:52:00.000Z",
+    "personName": "Parth Raivansh",
+    "documentType": "Republic of India Passport",
+    "documentTypeId": "passport",
+    "fileName": "parth_passport_scan.jpg",
+    "status": "VALID",
+    "isValid": true,
+    "confidence": 99,
+    "photoUrl": "data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%2240%22%20r%3D%2225%22%20fill%3D%22%2394a3b8%22%2F%3E%3Cpath%20d%3D%22M20%2090c0-20%2015-30%2030-30s30%2010%2030%2030%22%20fill%3D%22%2394a3b8%22%2F%3E%3C%2Fsvg%3E",
+    "reasons": [
+      "ICAO Doc 9303 Machine Readable Zone (MRZ) checksum verified",
+      "Optical variable ink and UV fluorescent ghost photo detected",
+      "Government issuance registry cryptographic signature matches",
+      "Admin Master Clearance Authenticated"
+    ],
+    "rawTextPreview": "P<INDPARTH<<RAIVANSH<<<<<<<<<<<<<<<<<<<<<<<<< Z9847123<4IND0602148M3101155<<<<<<<<<<<<<<02",
+    "source": "Identity Biometric Check",
+    "scannedBy": "Admin Parth"
+  },
+  {
+    "id": "PARTH-SCAN-SEED-2",
+    "timestamp": "15 Oct 2026, 07:15 PM",
+    "isoDate": "2026-10-15T13:45:00.000Z",
+    "personName": "Rajesh Verma",
+    "documentType": "Academic Degree Certificate",
+    "documentTypeId": "certificate",
+    "fileName": "forged_degree_sample.jpg",
+    "status": "INVALID",
+    "isValid": false,
+    "confidence": 24,
+    "photoUrl": "data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20320%20220%22%3E%3Crect%20width%3D%22320%22%20height%3D%22220%22%20rx%3D%2212%22%20fill%3D%22%23fff1f2%22%20stroke%3D%22%23f43f5e%22%20stroke-width%3D%223%22%2F%3E%3Crect%20x%3D%2220%22%20y%3D%2220%22%20width%3D%22280%22%20height%3D%22180%22%20rx%3D%228%22%20fill%3D%22%23fff%22%20stroke%3D%22%23fecdd3%22%2F%3E%3Ctext%20x%3D%22160%22%20y%3D%2255%22%20font-family%3D%22sans-serif%22%20font-size%3D%2214%22%20font-weight%3D%22bold%22%20fill%3D%22%23e11d48%22%20text-anchor%3D%22middle%22%3EUNIVERCITY%20OF%20DELHY%20%5BFORGED%5D%3C%2Ftext%3E%3Ctext%20x%3D%22160%22%20y%3D%2285%22%20font-family%3D%22sans-serif%22%20font-size%3D%2211%22%20fill%3D%22%23475569%22%20text-anchor%3D%22middle%22%3EBACHELOR%20OF%20TECHNOLOGY%3C%2Ftext%3E%3Ccircle%20cx%3D%22160%22%20cy%3D%22130%22%20r%3D%2228%22%20fill%3D%22%23fecdd3%22%20stroke%3D%22%23e11d48%22%20stroke-width%3D%222%22%2F%3E%3Ctext%20x%3D%22160%22%20y%3D%22135%22%20font-family%3D%22sans-serif%22%20font-size%3D%229%22%20font-weight%3D%22bold%22%20fill%3D%22%23be123c%22%20text-anchor%3D%22middle%22%3EFAKE%20SEAL%3C%2Ftext%3E%3Ctext%20x%3D%22160%22%20y%3D%22180%22%20font-family%3D%22sans-serif%22%20font-size%3D%2210%22%20font-weight%3D%22bold%22%20fill%3D%22%23e11d48%22%20text-anchor%3D%22middle%22%3EALTERED%20FONTS%20%C2%B7%20SPELLING%20ERRORS%3C%2Ftext%3E%3C%2Fsvg%3E",
+    "reasons": [
+      "Critical spelling error detected: 'Univercity' instead of 'University'",
+      "Synthetic digital seal overlay without paper fiber integration",
+      "Font rasterization mismatch on candidate name 'Rajesh Verma'",
+      "Registry serial number failed authoritative lookup"
+    ],
+    "rawTextPreview": "UNIVERCITY OF DELHY / Provisional Degree Certificate / Conferred upon Rajesh Verma / Grade: First Division / Altered Registration Number",
+    "source": "Document Verification",
+    "scannedBy": "Anonymous Client"
+  },
+  {
+    "id": "PARTH-SCAN-SEED-1",
+    "timestamp": "15 Oct 2026, 02:40 PM",
+    "isoDate": "2026-10-15T09:10:00.000Z",
+    "personName": "Arav Sharma",
+    "documentType": "Aadhaar Card (UIDAI)",
+    "documentTypeId": "aadhaar",
+    "fileName": "arav_aadhaar_original.jpg",
+    "status": "VALID",
+    "isValid": true,
+    "confidence": 99,
+    "photoUrl": "data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%2240%22%20r%3D%2225%22%20fill%3D%22%2394a3b8%22%2F%3E%3Cpath%20d%3D%22M20%2090c0-20%2015-30%2030-30s30%2010%2030%2030%22%20fill%3D%22%2394a3b8%22%2F%3E%3C%2Fsvg%3E",
+    "reasons": [
+      "Official UIDAI microprint & security guilloche pattern verified",
+      "Encrypted QR code cryptographic signature authentic",
+      "Government hologram optical reflectance confirmed",
+      "Biometric facial match confidence 98%"
+    ],
+    "rawTextPreview": "Government of India / Unique Identification Authority of India / Arav Sharma / DOB: 12/08/1998 / Male / 9874 5612 3456 / Mera Aadhaar, Meri Pehchan",
+    "source": "Smart Scanner (AI Auto-Detect)",
+    "scannedBy": "Arav (Live Ingestion)"
+  },
+  {
+    "id": "TEST-SCAN-DEVICE-B-1792098016604",
+    "personName": "Ananya Roy",
+    "documentType": "Aadhaar Card (UIDAI)",
+    "documentTypeId": "aadhaar",
+    "fileName": "ananya_aadhaar.jpg",
+    "status": "VALID",
+    "isValid": true,
+    "confidence": 99,
+    "photoUrl": "data:image/svg+xml;charset=UTF-8,<svg></svg>",
+    "reasons": [
+      "UIDAI QR authentic"
+    ],
+    "rawTextPreview": "Aadhaar / Ananya Roy",
+    "source": "Identity Biometric Check",
+    "scannedBy": "Ananya (iPad Device)"
+  }
+]

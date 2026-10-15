@@ -15,10 +15,13 @@ import { documentRouter } from './modules/documents/document.controller';
 import { verificationRouter } from './modules/verification/verification.controller';
 import { dashboardRouter } from './modules/dashboard/dashboard.controller';
 import { reportRouter } from './modules/reports/report.controller';
+import path from 'path';
+import fs from 'fs';
 import { apiKeyRouter } from './modules/apiKeys/apiKey.controller';
 import { webhookRouter } from './modules/webhooks/webhook.controller';
 import { auditRouter } from './modules/audit/audit.controller';
 import { adminRouter } from './modules/admin/admin.controller';
+import { adminScansRouter } from './modules/adminScans/adminScans.controller';
 
 export const app = express();
 
@@ -35,8 +38,8 @@ if (config.nodeEnv !== 'test') {
   app.use(morgan('dev'));
 }
 
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Health Check Endpoint
 const healthHandler = async (_req: Request, res: Response) => {
@@ -121,9 +124,24 @@ apiRouter.use('/api-keys', apiKeyRouter);
 apiRouter.use('/webhooks', webhookRouter);
 apiRouter.use('/audit-logs', auditRouter);
 apiRouter.use('/audit', auditRouter);
+apiRouter.use('/admin/scans', adminScansRouter);
+apiRouter.use('/admin-scans', adminScansRouter);
 apiRouter.use('/admin', adminRouter);
 
 app.use('/api/v1', apiRouter);
+
+// Serve Static Frontend if built in production or multi-device LAN mode
+const candidateDistDirs = [
+  path.resolve(__dirname, '../../frontend/dist'),
+  path.resolve(process.cwd(), 'frontend/dist'),
+  path.resolve(process.cwd(), 'dist')
+];
+for (const distDir of candidateDistDirs) {
+  if (fs.existsSync(distDir)) {
+    app.use(express.static(distDir));
+    break;
+  }
+}
 
 // Centralized Error Handling
 app.use(errorHandler);

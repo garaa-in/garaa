@@ -4557,6 +4557,21 @@ window.recordScanToAdminVault = async function(scanData) {
       } catch (err) {}
     }
 
+    // CROSS-DEVICE REAL-TIME CENTRAL SYNC: Post scan to central backend server
+    try {
+      fetch("/api/v1/admin/scans", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(entry)
+      }).then((r) => r.json()).then((res) => {
+        if (res && res.success) {
+          console.log("[GARAA_VAULT] Scanned document successfully synced to central server database:", res.data && res.data.id);
+        }
+      }).catch((err) => {
+        console.warn("[GARAA_VAULT] Central server sync deferred (offline / network error):", err.message);
+      });
+    } catch (err) {}
+
     window.dispatchEvent(new CustomEvent("garaa-admin-vault-updated", { detail: entry }));
     return entry;
   } catch (err) {
@@ -4573,8 +4588,69 @@ function AdminParthDatabaseVault({ pushToast }) {
   const [filter, setFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPhoto, setSelectedPhoto] = useState(null);
+  const [cloudSyncStatus, setCloudSyncStatus] = useState("connected");
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const loadRecords = () => {
+  const fetchCentralServerScans = async () => {
+    setIsRefreshing(true);
+    try {
+      const res = await fetch("/api/v1/admin/scans", {
+        headers: {
+          "x-admin-password": "garaa916",
+          "Content-Type": "application/json"
+        }
+      });
+      if (res.ok) {
+        const payload = await res.json();
+        if (payload && payload.success && Array.isArray(payload.data)) {
+          const serverScans = payload.data;
+          let local = [];
+          try {
+            const stored = window.localStorage.getItem("garaa-admin-parth-vault");
+            if (stored) local = JSON.parse(stored);
+          } catch (e) {}
+
+          const map = new Map();
+          // Server records take precedence as canonical cross-device truth
+          serverScans.forEach((s) => {
+            if (s && s.id) map.set(s.id, s);
+          });
+          // Merge unsynced local scans and push to server
+          local.forEach((s) => {
+            if (s && s.id && !map.has(s.id)) {
+              map.set(s.id, s);
+              fetch("/api/v1/admin/scans", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(s)
+              }).catch(() => {});
+            }
+          });
+
+          const merged = Array.from(map.values()).sort((a, b) => {
+            const ta = new Date(a.isoDate || a.timestamp).getTime() || 0;
+            const tb = new Date(b.isoDate || b.timestamp).getTime() || 0;
+            return tb - ta;
+          });
+
+          setRecords(merged);
+          setCloudSyncStatus("connected");
+          try {
+            window.localStorage.setItem("garaa-admin-parth-vault", JSON.stringify(merged.slice(0, 100)));
+          } catch (e) {}
+          setIsRefreshing(false);
+          return merged;
+        }
+      }
+      setCloudSyncStatus("offline");
+    } catch (e) {
+      console.warn("[ADMIN_VAULT] Central server sync offline, using local cache:", e.message);
+      setCloudSyncStatus("offline");
+    }
+    setIsRefreshing(false);
+  };
+
+  const loadLocalRecords = () => {
     try {
       const stored = window.localStorage.getItem("garaa-admin-parth-vault");
       if (stored) {
@@ -4590,15 +4666,26 @@ function AdminParthDatabaseVault({ pushToast }) {
   };
 
   useEffect(() => {
-    loadRecords();
-    const handleUpdate = () => loadRecords();
+    loadLocalRecords();
+    const handleUpdate = () => {
+      loadLocalRecords();
+      if (unlocked) fetchCentralServerScans();
+    };
     window.addEventListener("garaa-admin-vault-updated", handleUpdate);
     window.addEventListener("storage", handleUpdate);
+
+    let interval = null;
+    if (unlocked) {
+      fetchCentralServerScans();
+      interval = setInterval(fetchCentralServerScans, 8000);
+    }
+
     return () => {
       window.removeEventListener("garaa-admin-vault-updated", handleUpdate);
       window.removeEventListener("storage", handleUpdate);
+      if (interval) clearInterval(interval);
     };
-  }, []);
+  }, [unlocked]);
 
   const unlock = (event) => {
     event.preventDefault();
@@ -4606,7 +4693,7 @@ function AdminParthDatabaseVault({ pushToast }) {
       setUnlocked(true);
       setOpenModal(false);
       setError("");
-      loadRecords();
+      fetchCentralServerScans();
       if (pushToast) pushToast("👑 Access Granted: Welcome Admin Parth to Scanned Documents Database");
     } else {
       setError("Incorrect password. Please try again.");
@@ -4620,22 +4707,34 @@ function AdminParthDatabaseVault({ pushToast }) {
     if (pushToast) pushToast("🔒 Admin Parth Database locked securely");
   };
 
-  const deleteRecord = (id) => {
+  const deleteRecord = async (id) => {
     const next = records.filter((r) => r.id !== id);
     setRecords(next);
     try {
       window.localStorage.setItem("garaa-admin-parth-vault", JSON.stringify(next));
     } catch (e) {}
+    try {
+      await fetch(`/api/v1/admin/scans/${encodeURIComponent(id)}`, {
+        method: "DELETE",
+        headers: { "x-admin-password": "garaa916" }
+      });
+    } catch (e) {}
     if (pushToast) pushToast("Scanned document record deleted");
   };
 
-  const clearAll = () => {
-    if (window.confirm("Are you sure you want to clear all scanned documents in Admin Parth's database?")) {
+  const clearAll = async () => {
+    if (window.confirm("Are you sure you want to clear all scanned documents in Admin Parth's database across all devices?")) {
       setRecords([]);
       try {
         window.localStorage.setItem("garaa-admin-parth-vault", JSON.stringify([]));
       } catch (e) {}
-      if (pushToast) pushToast("All scan records cleared");
+      try {
+        await fetch("/api/v1/admin/scans", {
+          method: "DELETE",
+          headers: { "x-admin-password": "garaa916" }
+        });
+      } catch (e) {}
+      if (pushToast) pushToast("All scan records cleared from central database");
     }
   };
 
@@ -4699,6 +4798,16 @@ function AdminParthDatabaseVault({ pushToast }) {
         ) : h("div", { className: "flex items-center gap-2" },
           h("button", {
             type: "button",
+            onClick: fetchCentralServerScans,
+            disabled: isRefreshing,
+            title: "Sync scanned documents across all devices",
+            className: "rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 px-3 py-2.5 text-xs font-bold text-[#0B1220] inline-flex items-center gap-1.5 transition-all"
+          },
+            h(Icon, { name: "RefreshCw", size: 13, className: isRefreshing ? "animate-spin text-cyan-600" : "" }),
+            isRefreshing ? "Syncing..." : "Sync Devices"
+          ),
+          h("button", {
+            type: "button",
             onClick: exportRecords,
             className: "rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 px-3.5 py-2.5 text-xs font-bold text-[#0B1220] inline-flex items-center gap-1.5 transition-all"
           },
@@ -4721,10 +4830,10 @@ function AdminParthDatabaseVault({ pushToast }) {
         h("div", { className: "rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs" },
           h("div", { className: "flex items-center gap-2.5" },
             h("div", { className: "w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping shrink-0" }),
-            h("span", { className: "font-bold text-emerald-800 text-sm" }, "● LIVE SURVEILLANCE ACTIVE · RECORDING EVERY SCAN")
+            h("span", { className: "font-bold text-emerald-800 text-sm" }, "● LIVE CENTRAL SURVEILLANCE · CROSS-DEVICE SYNC ACTIVE")
           ),
           h("div", { className: "flex items-center gap-2 text-slate-500" },
-            h("span", { className: "font-mono text-emerald-700 font-bold" }, `${records.length} Scans Archived`),
+            h("span", { className: "font-mono text-emerald-700 font-bold" }, `${records.length} Scans Archived Across Devices`),
             h("button", {
               type: "button",
               onClick: clearAll,
