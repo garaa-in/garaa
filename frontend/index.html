@@ -507,6 +507,30 @@
   .zl-pay-btn-confirm{width:100%;padding:12px 18px;border-radius:999px;background:linear-gradient(135deg,#0f172a 0%,#1e1b4b 100%);color:#ffffff;font-family:'Sora',sans-serif;font-weight:700;font-size:13px;border:0;cursor:pointer;transition:all 240ms ease;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 10px 24px -10px rgba(15,23,42,.5);}
   .zl-pay-btn-confirm:hover{background:linear-gradient(135deg,#4f46e5 0%,#6366f1 100%);box-shadow:0 14px 28px -8px rgba(99,102,241,.55);transform:translateY(-1px);}
   .zl-pay-success{background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.3);color:#15803d;padding:12px 16px;border-radius:12px;font-size:12px;font-weight:600;margin-top:6px;line-height:1.45;}
+  .zl-plan-footnote{text-align:center;margin-top:40px;font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.6;color:#64748b;max-width:820px;margin-left:auto;margin-right:auto;letter-spacing:.02em;}
+  @media (max-width:980px){
+    .zl-plans{padding:60px 0 50px;}
+    .zl-plans-head{margin-bottom:34px;}
+    .zl-plans-grid{grid-template-columns:1fr;max-width:440px;margin:0 auto;gap:22px;}
+    .zl-plan-card{padding:26px 20px;border-radius:24px!important;transform:none!important;}
+    .zl-plan-card:hover,.zl-plan-card.is-expanded{transform:none!important;box-shadow:0 10px 30px -10px rgba(99,102,241,.2),inset 0 1px 0 rgba(255,255,255,1)!important;}
+    .zl-plan-reveal{max-height:none!important;opacity:1!important;transform:none!important;pointer-events:auto!important;}
+    .zl-plan-feature{opacity:1!important;transform:none!important;}
+  }
+  @media (max-width:540px){
+    .zl-plan-price{font-size:38px;}
+    .zl-plan-name{font-size:22px;}
+    .zl-plan-inr{font-size:10.5px;padding:2px 6px;margin-left:4px;}
+    .zl-pay-modal{padding:24px 16px 20px;max-width:94vw;border-radius:22px;}
+    .zl-pay-title{font-size:20px;}
+    .zl-pay-qr-container{width:180px;height:180px;}
+    .zl-pay-amount{font-size:24px;}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .zl-plan-card,.zl-plan-card:hover,.zl-plan-card.is-expanded,.zl-plan-price,.zl-plan-soon-text,.zl-plan-reveal,.zl-plan-btn,.zl-plan-btn-arrow{transform:none!important;transition:none!important;box-shadow:none!important;}
+    .zl-plan-reveal{max-height:none!important;opacity:1!important;pointer-events:auto!important;}
+    .zl-plan-feature{opacity:1!important;transform:none!important;}
+  }
 </style>
 <style id="zx-css">
 #zx{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:1}
@@ -1299,33 +1323,6 @@ function classifyDocument(doc, rawText) {
   const words = text.match(/[A-Z0-9]{3,}/g) || [];
   const cleanRaw = (rawText || "").trim();
 
-  // 1. Criminal Record Alert ONLY for "Parth"
-  const isParth = /\bPARTH\b/i.test(text) || /\bPARTH\b/i.test(cleanRaw) || (doc && doc.name && /\bPARTH\b/i.test(doc.name));
-  if (isParth) {
-    return {
-      status: "FAILED",
-      headline: "CRIMINAL RECORD MATCH FOUND",
-      detected: "Parth (Criminal Watchlist Hit)",
-      confidence: 99,
-      issues: [
-        {
-          title: "CRIMINAL WATCHLIST ALERT: PARTH",
-          severity: "CRITICAL",
-          detail: "Subject 'Parth' matched an active criminal watchlist profile in the National Cyber Threat Intelligence & Police Crime Index (Case #ZY-DEMO-CASE-3101)."
-        }
-      ],
-      why: [
-        "Subject name 'Parth' flagged on law enforcement criminal index",
-        "Active Red Flag warrant profile: Cyber Threat & Document Fraud Division",
-        "Statutory verification blocked — document invalidated"
-      ],
-      risk: {
-        level: "CRITICAL",
-        reasons: ["Subject flagged in criminal screening index", "High cyber-fraud likelihood score (98%)"]
-      },
-      recommendation: "IMMEDIATE ACTION REQUIRED: Deny credential verification. Subject 'Parth' is flagged for criminal cybercrime review. Escalate to authorized compliance officer."
-    };
-  }
 
   // 2. Non-Document Object / Surface Check: If there is no readable document text
   if (words.length < 3 && cleanRaw.length < 12) {
@@ -3837,12 +3834,10 @@ function cyberDateKey(value) {
   return match ? `${match[3]}-${match[2].padStart(2, "0")}-${match[1].padStart(2, "0")}` : normalizeCyberName(value);
 }
 function findCyberRecord(subject) {
-  const name = (subject && subject.name || "").toLowerCase();
-  // Only documents with subject name "Parth" are marked as criminal
-  if (name.includes("parth")) {
-    return CYBER_PERSON_DATABASE[0];
-  }
-  return null;
+  const name = normalizeCyberName(subject && subject.name || "");
+  if (!name) return null;
+  // Match exact demo criminal test name only (e.g. "parth raivansh") so genuine users with name "Parth" are never falsely flagged
+  return CYBER_PERSON_DATABASE.find(record => normalizeCyberName(record.name) === name) || null;
 }
 function cyberScenarioFor(subject) {
   const record = findCyberRecord(subject);
@@ -5833,35 +5828,59 @@ function PaymentModal({ plan, onClose, onSuccessWorkspace }) {
   );
 }
 
+function useCountUp(target, start = 1, duration = 1400, trigger = false) {
+  const [val, setVal] = useState(start);
+  useEffect(() => {
+    if (!trigger) return;
+    let startTimestamp = null;
+    let animId;
+    const step = (timestamp) => {
+      if (!startTimestamp) startTimestamp = timestamp;
+      const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+      const ease = 1 - Math.pow(1 - progress, 3);
+      setVal(Math.round(start + (target - start) * ease));
+      if (progress < 1) {
+        animId = requestAnimationFrame(step);
+      }
+    };
+    animId = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(animId);
+  }, [trigger, target, start, duration]);
+  return val;
+}
+
 function PricingSection({ onOpenScanner, onOpenScreening }) {
   const [activeCard, setActiveCard] = useState(null);
   const [traceNotice, setTraceNotice] = useState(false);
   const [paymentPlan, setPaymentPlan] = useState(null);
+  const [hasScrolledIn, setHasScrolledIn] = useState(false);
+  const sectionRef = useRef(null);
 
   useEffect(() => {
-    const handleOutsideClick = (e) => {
-      if (!e.target.closest || !e.target.closest(".zl-plan-card")) {
-        setActiveCard(null);
-      }
-    };
-    window.addEventListener("click", handleOutsideClick);
-    return () => window.removeEventListener("click", handleOutsideClick);
-  }, []);
-
-  const isTouchDevice = () => {
-    return typeof window !== "undefined" && window.matchMedia && !window.matchMedia("(hover: hover) and (pointer: fine)").matches;
-  };
-
-  const handleCardClick = (cardId, action) => (e) => {
-    if (!isTouchDevice()) {
-      if (action) action(e);
+    const el = sectionRef.current || document.getElementById("zl-plans");
+    if (!el || !("IntersectionObserver" in window)) {
+      setHasScrolledIn(true);
       return;
     }
-    if (activeCard !== cardId) {
-      setActiveCard(cardId);
-    } else {
-      if (action) action(e);
-    }
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          setHasScrolledIn(true);
+          io.disconnect();
+        }
+      });
+    }, { threshold: 0.12 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  const count29 = useCountUp(29, 1, 1300, hasScrolledIn);
+  const countInr2499 = useCountUp(2499, 100, 1400, hasScrolledIn);
+  const count99 = useCountUp(99, 1, 1300, hasScrolledIn);
+  const countInr8499 = useCountUp(8499, 500, 1400, hasScrolledIn);
+
+  const handleCardClick = (cardId, action) => (e) => {
+    if (action) action(e);
   };
 
   const handleActionClick = (action) => (e) => {
@@ -5875,7 +5894,7 @@ function PricingSection({ onOpenScanner, onOpenScreening }) {
     setTimeout(() => setTraceNotice(false), 3800);
   };
 
-  return h("section", { id: "zl-plans", className: "zl-wrap zl-plans" },
+  return h("section", { id: "zl-plans", ref: sectionRef, className: "zl-wrap zl-plans" },
     h("div", { className: "zl-plans-head" },
       h("div", { className: "zl-label zl-rev" }, "GARAA PLANS"),
       h("h2", { className: "zl-disp zl-rev", style: { transitionDelay: "100ms" } }, "Trust, at every level."),
@@ -5884,7 +5903,7 @@ function PricingSection({ onOpenScanner, onOpenScreening }) {
     h("div", { className: "zl-plans-grid" },
       // Card 1: Garaa Verify
       h("div", {
-        className: "zl-plan-card zl-plan-card-verify zl-rev interactive" + (activeCard === "verify" ? " is-expanded" : ""),
+        className: "zl-plan-card zl-plan-card-verify zl-rev interactive",
         style: { transitionDelay: "320ms" },
         role: "button",
         tabIndex: 0,
@@ -5903,9 +5922,9 @@ function PricingSection({ onOpenScanner, onOpenScreening }) {
         ),
         h("h3", { className: "zl-plan-name" }, "GARAA VERIFY"),
         h("div", { className: "zl-plan-price-wrap" },
-          h("span", { className: "zl-plan-price" }, "$29"),
+          h("span", { className: "zl-plan-price" }, "$" + count29),
           h("span", { className: "zl-plan-period" }, "/ MONTH"),
-          h("span", { className: "zl-plan-inr", title: "Converted price in Indian Rupees" }, "₹2,499")
+          h("span", { className: "zl-plan-inr", title: "Converted price in Indian Rupees" }, "₹" + countInr2499.toLocaleString("en-IN"))
         ),
         h("div", { className: "zl-plan-reveal" },
           h("div", { className: "zl-plan-divider" }),
@@ -5938,7 +5957,7 @@ function PricingSection({ onOpenScanner, onOpenScreening }) {
 
       // Card 2: Garaa Screen
       h("div", {
-        className: "zl-plan-card zl-plan-card-screen zl-rev interactive" + (activeCard === "screen" ? " is-expanded" : ""),
+        className: "zl-plan-card zl-plan-card-screen zl-rev interactive",
         style: { transitionDelay: "440ms" },
         role: "button",
         tabIndex: 0,
@@ -5961,9 +5980,9 @@ function PricingSection({ onOpenScanner, onOpenScreening }) {
         ),
         h("h3", { className: "zl-plan-name" }, "GARAA SCREEN"),
         h("div", { className: "zl-plan-price-wrap" },
-          h("span", { className: "zl-plan-price" }, "$99"),
+          h("span", { className: "zl-plan-price" }, "$" + count99),
           h("span", { className: "zl-plan-period" }, "/ MONTH"),
-          h("span", { className: "zl-plan-inr", title: "Converted price in Indian Rupees" }, "₹8,499")
+          h("span", { className: "zl-plan-inr", title: "Converted price in Indian Rupees" }, "₹" + countInr8499.toLocaleString("en-IN"))
         ),
         h("div", { className: "zl-plan-reveal" },
           h("div", { className: "zl-plan-divider" }),
@@ -5996,7 +6015,7 @@ function PricingSection({ onOpenScanner, onOpenScreening }) {
 
       // Card 3: TraceX
       h("div", {
-        className: "zl-plan-card zl-plan-card-tracex zl-rev interactive" + (activeCard === "tracex" ? " is-expanded" : ""),
+        className: "zl-plan-card zl-plan-card-tracex zl-rev interactive",
         style: { transitionDelay: "560ms" },
         role: "button",
         tabIndex: 0,
@@ -6090,10 +6109,10 @@ function Landing({ onStart, onGo }) {
   const go = (id) => (e) => { e.preventDefault(); const t = document.getElementById(id); if (t) t.scrollIntoView({ behavior: "smooth" }); };
   const start = () => (onGo ? onGo("smartscan") : onStart());
   const caps = [
-    { k: "doc", t: ["Document", "Verification"], d: "Upload a document and run the existing verification checks.", v: "verify" },
-    { k: "face", t: ["Face", "Match"], d: "Compare a live face against the document photo.", v: "identity" },
-    { k: "fraud", t: ["Fraud", "Detection"], d: "See the verification verdict and anomaly signals.", v: "verify" },
-    { k: "cyber", t: ["Cyber", "Intelligence"], d: "Identity correlation and record-screening intelligence.", v: "cyberintel" }
+    { k: "doc", t: ["Document", "Verification"], d: "Upload a document and run real-time AI verification checks.", v: "smartscan" },
+    { k: "face", t: ["Face", "Match"], d: "Compare a live face against the document photo with liveness checks.", v: "smartscan" },
+    { k: "fraud", t: ["Fraud", "Detection"], d: "Inspect tampering indicators, visual anomalies, and verification verdicts.", v: "smartscan" },
+    { k: "cyber", t: ["Cyber", "Intelligence"], d: "Deep forensic scanning, document structure checks, and fraud intelligence.", v: "smartscan" }
   ];
   return h("div", { className: "zl", onMouseMove: onMove },
     h("header", { className: "zl-nav" }, h("div", { className: "zl-wrap zl-nav-in" },
@@ -6113,9 +6132,9 @@ function Landing({ onStart, onGo }) {
     h("section", { id: "zl-features", className: "zl-caps" }, h("div", { className: "zl-wrap" },
       h("div", { className: "zl-label zl-rev" }, "Our features"),
       h("h2", { className: "zl-rev" }, "Garaa", h("br"), "Capabilities"),
-      h("div", { className: "zl-grid" }, caps.map((c, i) => h("button", { key: c.t.join(""), className: "zl-card zl-rev", style: { transitionDelay: i * 90 + "ms" }, onClick: () => (onGo ? onGo(c.v) : onStart()) },
+      h("div", { className: "zl-grid" }, caps.map((c, i) => h("button", { key: c.t.join(""), className: "zl-card zl-rev", style: { transitionDelay: i * 90 + "ms" }, onClick: start },
         h("div", { className: "zl-art" }, h(ZLArt, { kind: c.k })),
-        h("h3", null, c.t[0], h("br"), c.t[1]), h("small", null, c.d), h("em", null, "Open →")))))),
+        h("h3", null, c.t[0], h("br"), c.t[1]), h("small", null, c.d), h("em", null, "Start Verification →")))))),
     h("section", { id: "zl-how", className: "zl-wrap zl-steps" }, [["01", "Scan", "Upload a document or capture a face image."], ["02", "Analyze", "Garaa checks details, format and consistency."], ["03", "Verify", "Get an instant verdict and a downloadable report."]].map(([n, t, d], i) => h("div", { key: n, className: "zl-step zl-rev", style: { transitionDelay: i * 90 + "ms" } }, h("b", null, n), h("h4", null, t), h("p", null, d)))),
     h("section", { id: "zl-about", className: "zl-wrap zl-split zl-rev", style: { paddingTop: 40 } },
       h("div", null, h("div", { className: "zl-label" }, "About Garaa"), h("h2", null, "Real identity.", h("br"), "Real security.")),
@@ -6552,7 +6571,7 @@ setInterval(()=>{
 
 /* ---- START VERIFICATION: cinematic portal, then the existing handler runs unchanged ---- */
 document.addEventListener("click",e=>{
- const b=e.target.closest&&e.target.closest(".zl-btn");
+ const b=e.target.closest&&(e.target.closest(".zl-btn")||e.target.closest(".zl-card"));
  if(!b||b.__zx||!/Start Verification/i.test(b.textContent))return;
  e.stopImmediatePropagation();e.preventDefault();
  const go=()=>{b.__zx=1;b.click();b.__zx=0};
@@ -6560,7 +6579,7 @@ document.addEventListener("click",e=>{
  if(window.__zxs)return;window.__zxs=1;
   zxScan(go,()=>{window.__zxs=0},b);
 },true);
-document.addEventListener("pointerover",e=>{const b=e.target.closest&&e.target.closest(".zl-btn");if(b){const r=b.getBoundingClientRect();att={x:r.left+r.width/2,y:r.top+r.height/2}}else att=null},{passive:true});
+document.addEventListener("pointerover",e=>{const b=e.target.closest&&(e.target.closest(".zl-btn")||e.target.closest(".zl-card"));if(b){const r=b.getBoundingClientRect();att={x:r.left+r.width/2,y:r.top+r.height/2}}else att=null},{passive:true});
 document.addEventListener("pointermove",e=>{const c=e.target.closest&&e.target.closest(".glass");if(c){const r=c.getBoundingClientRect();c.style.setProperty("--mx",e.clientX-r.left+"px");c.style.setProperty("--my",e.clientY-r.top+"px")}},{passive:true});
 setInterval(()=>{document.querySelectorAll("button").forEach(b=>{if(b.textContent.trim()==="Smart Scan")b.classList.add("zx-hot")})},500);
 setInterval(()=>{const h=document.querySelector(".zl-hero");if(h&&!h.querySelector(".zx-gfx")){const d=document.createElement("div");d.className="zx-gfx";d.setAttribute("aria-hidden","true");
@@ -7021,7 +7040,8 @@ function parse(t){
   const gm=t.match(/\b(Male|Female|Transgender)\b/i);
   if(gm)f.gender=gm[1];
   if(/\bPARTH\b/i.test(u)||(S.name&&/\bPARTH\b/i.test(S.name))){
-    f.name="Parth Raivansh";
+    const pm=u.match(/\bPARTH(\s+[A-Z]+){1,3}\b/i);
+    f.name=pm?pm[0].toLowerCase().replace(/\b\w/g,c=>c.toUpperCase()):"Parth";
   } else if(/\b(AARAV|ARAV)\b/i.test(u)||(S.name&&/\b(AARAV|ARAV)\b/i.test(S.name))){
     const am=u.match(/\b(AARAV|ARAV)(\s+[A-Z]+)?\b/i);
     f.name=am?am[0].toLowerCase().replace(/\b\w/g,c=>c.toUpperCase()):"Arav";
@@ -7056,23 +7076,7 @@ function judge(){
   const words=rawText.split(/\s+/).filter(w=>w.length>1);
   const cleanRaw=rawText.replace(/[^A-Za-z0-9]/g,"");
   const txt=((S.text||"")+" "+(f.name||"")+" "+(S.name||"")).toUpperCase();
-  const isParth=/\bPARTH\b/i.test(txt);
   const isBadSpelling=/ADHARR|AADDHAR|ADHAARR|AHDAAR|AADHER|ADHARA|AADHAARA|PANCARDD|INCOMETAXX|PERMENANT|PASSPORTT|REPUBLIK|DRIVNG|LICENCEE|CERTIFIKATE|UNIVERCITY|DEGRE/i.test(txt);
-
-  if(isParth){
-    c.push([false,"Criminal Watchlist Screening","CRITICAL MATCH: INTERPOL Red Notice & CBI Database (Parth Raivansh)"]);
-    c.push([false,"National Threat Matrix","Subject flagged in Cyber Threat & Document Fraud Division"]);
-    c.push([false,"Biometric Integrity","Statutory verification blocked — high risk criminal profile"]);
-    c.push([false,"Verification Verdict","REJECTED - ACTIVE CRIMINAL RECORD FOUND"]);
-    return{
-      i:"🚨",
-      t:"CRIMINAL RECORD MATCH FOUND",
-      m:"CRITICAL: Subject matches active INTERPOL Red Notice & CBI Watchlist (Case Ref: ZY-DEMO-CASE-3101 · Financial Fraud & Cyber Espionage). Immediate quarantine applied.",
-      c,
-      nm:false,
-      db:false
-    };
-  }
 
   // Non-document object or surface check:
   if(words.length<3 && cleanRaw.length<12){
