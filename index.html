@@ -462,18 +462,51 @@
   .zl-plan-btn-quiet{background:rgba(245,243,255,.85);color:#7c3aed;border:1.5px solid rgba(221,214,254,.85)!important;box-shadow:0 4px 14px -6px rgba(124,58,237,.15);}
   .zl-plan-btn-quiet:hover{border-color:rgba(167,139,250,.85)!important;color:#6d28d9;background:#faf5ff;box-shadow:0 8px 20px -8px rgba(124,58,237,.3);transform:translateY(-1px);}
   .zl-plan-notice{margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:11px;text-align:center;color:#6d28d9;background:rgba(167,139,250,.14);padding:8px 12px;border-radius:10px;border:1px solid rgba(167,139,250,.3);line-height:1.45;}
-  .zl-plan-footnote{text-align:center;margin-top:40px;font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.6;color:#64748b;max-width:820px;margin-left:auto;margin-right:auto;letter-spacing:.02em;}
-  @media (max-width:980px){
-    .zl-plans-grid{grid-template-columns:1fr;max-width:440px;margin:0 auto;gap:24px;}
-    .zl-plan-card{padding:28px 24px;}
-    .zl-plan-card:hover,
-    .zl-plan-card.is-expanded{transform:scale(1.025) translateY(-2px);}
-  }
-  @media (prefers-reduced-motion:reduce){
-    .zl-plan-card,.zl-plan-card:hover,.zl-plan-card.is-expanded,.zl-plan-price,.zl-plan-soon-text,.zl-plan-reveal,.zl-plan-btn,.zl-plan-btn-arrow{transform:none!important;transition:none!important;box-shadow:none!important;}
-    .zl-plan-reveal{max-height:none!important;opacity:1!important;pointer-events:auto!important;}
-    .zl-plan-feature{opacity:1!important;transform:none!important;}
-  }
+  .zl-plan-inr{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:#4f46e5;background:rgba(99,102,241,.09);border:1px solid rgba(99,102,241,.2);padding:3px 8px;border-radius:6px;margin-left:6px;letter-spacing:.02em;vertical-align:baseline;}
+  /* ===== Payment Scanner Modal ===== */
+  .zl-pay-overlay{position:fixed;inset:0;z-index:9999;background:rgba(8,12,28,.78);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);display:flex;align-items:center;justify-content:center;padding:20px;animation:zlPayFadeIn 240ms cubic-bezier(.16,1,.3,1);}
+  @keyframes zlPayFadeIn{from{opacity:0;}to{opacity:1;}}
+  @keyframes zlPayScaleIn{from{opacity:0;transform:scale(.94) translateY(12px);}to{opacity:1;transform:scale(1) translateY(0);}}
+  .zl-pay-modal{position:relative;width:100%;max-width:480px;max-height:92vh;overflow-y:auto;border-radius:28px;padding:32px 28px 28px;background:linear-gradient(170deg,#ffffff 0%,#f8f6ff 100%);border:1.5px solid rgba(167,139,250,.55);box-shadow:0 0 70px rgba(167,139,250,.35),0 30px 70px -15px rgba(15,23,42,.45);animation:zlPayScaleIn 280ms cubic-bezier(.16,1,.3,1);color:#0f172a;text-align:center;}
+  .zl-pay-close{position:absolute;top:18px;right:18px;width:36px;height:36px;border-radius:50%;background:rgba(241,245,249,.85);border:1px solid rgba(203,213,225,.8);color:#64748b;font-size:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all 200ms ease;line-height:1;padding:0;}
+  .zl-pay-close:hover{background:#0f172a;color:#ffffff;border-color:#0f172a;}
+  .zl-pay-badge{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;padding:5px 14px;border-radius:999px;display:inline-flex;align-items:center;gap:6px;background:rgba(99,102,241,.1);color:#4f46e5;border:1px solid rgba(99,102,241,.25);margin-bottom:12px;}
+  .zl-pay-title{font-family:'Sora',sans-serif;font-weight:800;font-size:24px;letter-spacing:-.02em;color:#0f172a;margin:0 0 6px;}
+  .zl-pay-subtitle{font-size:13px;line-height:1.45;color:#64748b;margin:0 0 18px;}
+  .zl-pay-tabs{display:flex;background:rgba(241,245,249,.85);border-radius:14px;padding:4px;gap:4px;margin-bottom:18px;}
+  .zl-pay-tab{flex:1;padding:10px 12px;border-radius:10px;border:0;background:transparent;font-family:'Sora',sans-serif;font-size:12px;font-weight:700;color:#64748b;cursor:pointer;transition:all 200ms ease;}
+  .zl-pay-tab.active{background:#ffffff;color:#4338ca;box-shadow:0 4px 12px -2px rgba(99,102,241,.2);}
+  .zl-pay-price-box{background:linear-gradient(135deg,rgba(99,102,241,.07) 0%,rgba(167,139,250,.1) 100%);border:1px solid rgba(167,139,250,.3);border-radius:16px;padding:14px 18px;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;}
+  .zl-pay-price-left{text-align:left;}
+  .zl-pay-price-label{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:#6d28d9;text-transform:uppercase;letter-spacing:.04em;}
+  .zl-pay-price-rate{font-size:11px;color:#64748b;margin-top:2px;}
+  .zl-pay-price-right{text-align:right;}
+  .zl-pay-amount{font-family:'Sora',sans-serif;font-weight:800;font-size:30px;color:#0f172a;line-height:1;}
+  .zl-pay-usd{font-size:11.5px;font-weight:600;color:#64748b;margin-top:3px;}
+  .zl-pay-qr-container{position:relative;width:230px;height:230px;margin:0 auto 16px;background:#ffffff;border-radius:20px;padding:10px;box-shadow:0 12px 36px -10px rgba(99,102,241,.25),0 0 30px rgba(167,139,250,.2);border:1px solid rgba(221,214,254,.8);display:flex;align-items:center;justify-content:center;overflow:hidden;}
+  .zl-pay-qr-img{width:100%;height:100%;object-fit:contain;border-radius:12px;display:block;}
+  .zl-pay-scanner-beam{position:absolute;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,rgba(99,102,241,.9),#c084fc,transparent);box-shadow:0 0 14px #818cf8,0 0 24px #a855f7;animation:qrLaserSweep 2.4s ease-in-out infinite;pointer-events:none;z-index:2;}
+  @keyframes qrLaserSweep{0%{top:8%;opacity:.1;}15%{opacity:1;}85%{opacity:1;}100%{top:90%;opacity:.1;}}
+  .zl-pay-corner{position:absolute;width:14px;height:14px;border:2.5px solid #6366f1;pointer-events:none;z-index:3;}
+  .zl-pay-corner-tl{top:8px;left:8px;border-right:0;border-bottom:0;border-top-left-radius:6px;}
+  .zl-pay-corner-tr{top:8px;right:8px;border-left:0;border-bottom:0;border-top-right-radius:6px;}
+  .zl-pay-corner-bl{bottom:8px;left:8px;border-right:0;border-top:0;border-bottom-left-radius:6px;}
+  .zl-pay-corner-br{bottom:8px;right:8px;border-left:0;border-top:0;border-bottom-right-radius:6px;}
+  .zl-pay-instruct{font-size:12.5px;line-height:1.45;color:#475569;margin:0 0 14px;font-weight:500;}
+  .zl-pay-apps-pills{display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:14px;flex-wrap:wrap;}
+  .zl-pay-app-pill{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;padding:4px 8px;border-radius:6px;background:rgba(241,245,249,.9);color:#334155;border:1px solid rgba(226,232,240,.9);}
+  .zl-pay-btn-app{width:100%;padding:10px 16px;border-radius:999px;background:rgba(245,243,255,.9);color:#6d28d9;border:1.5px solid rgba(221,214,254,.9);font-family:'Sora',sans-serif;font-weight:700;font-size:12px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;margin-bottom:12px;transition:all 200ms ease;}
+  .zl-pay-btn-app:hover{background:#faf5ff;border-color:#a855f7;color:#581c87;}
+  .zl-pay-upi-bar{background:rgba(248,250,252,.9);border:1px solid rgba(226,232,240,.95);border-radius:12px;padding:9px 12px;display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#334155;}
+  .zl-pay-upi-copy{background:#ffffff;border:1px solid rgba(203,213,225,.9);padding:4px 9px;border-radius:7px;font-size:10.5px;font-weight:700;color:#4f46e5;cursor:pointer;transition:all 180ms ease;}
+  .zl-pay-upi-copy:hover{background:#4f46e5;color:#ffffff;border-color:#4f46e5;}
+  .zl-pay-confirm-wrap{border-top:1px dashed rgba(203,213,225,.9);padding-top:14px;}
+  .zl-pay-input-row{display:flex;gap:8px;margin-bottom:10px;}
+  .zl-pay-input{flex:1;padding:10px 14px;border-radius:12px;border:1.5px solid rgba(203,213,225,.9);font-size:12px;font-family:'JetBrains Mono',monospace;color:#0f172a;outline:none;background:#ffffff;transition:border-color 200ms ease;}
+  .zl-pay-input:focus{border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,.15);}
+  .zl-pay-btn-confirm{width:100%;padding:12px 18px;border-radius:999px;background:linear-gradient(135deg,#0f172a 0%,#1e1b4b 100%);color:#ffffff;font-family:'Sora',sans-serif;font-weight:700;font-size:13px;border:0;cursor:pointer;transition:all 240ms ease;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 10px 24px -10px rgba(15,23,42,.5);}
+  .zl-pay-btn-confirm:hover{background:linear-gradient(135deg,#4f46e5 0%,#6366f1 100%);box-shadow:0 14px 28px -8px rgba(99,102,241,.55);transform:translateY(-1px);}
+  .zl-pay-success{background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.3);color:#15803d;padding:12px 16px;border-radius:12px;font-size:12px;font-weight:600;margin-top:6px;line-height:1.45;}
 </style>
 <style id="zx-css">
 #zx{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:1}
@@ -5627,9 +5660,183 @@ function Moon3D() {
   );
 }
 
+function PaymentModal({ plan, onClose, onSuccessWorkspace }) {
+  const [currentPlan, setCurrentPlan] = useState(plan || "verify");
+  const [copied, setCopied] = useState(false);
+  const [utr, setUtr] = useState("");
+  const [status, setStatus] = useState("idle");
+
+  const planDetails = {
+    verify: {
+      name: "Garaa Verify",
+      tag: "CORE VERIFIER",
+      usd: "$29 / month",
+      usdNum: 29,
+      inr: "₹2,499",
+      inrNum: 2499,
+      rate: "1 USD ≈ ₹86.17 INR",
+      desc: "Full monthly access to AI-assisted document verification and anomaly detection.",
+      appLink: "upi://pay?pa=8591250390-2@ybl&pn=PARTH%20VIJAY%20GIDDE&am=2499&cu=INR&tn=Garaa%20Verify%20Subscription"
+    },
+    screen: {
+      name: "Garaa Screen",
+      tag: "DEEP SCREENING",
+      usd: "$99 / month",
+      usdNum: 99,
+      inr: "₹8,499",
+      inrNum: 8499,
+      rate: "1 USD ≈ ₹85.85 INR",
+      desc: "Dedicated monthly access to authorized criminal-record screening workflows.",
+      appLink: "upi://pay?pa=8591250390-2@ybl&pn=PARTH%20VIJAY%20GIDDE&am=8499&cu=INR&tn=Garaa%20Screen%20Subscription"
+    }
+  };
+
+  const cur = planDetails[currentPlan] || planDetails.verify;
+
+  const handleCopy = () => {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText("8591250390-2@ybl");
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2200);
+  };
+
+  const handleConfirm = () => {
+    setStatus("verifying");
+    setTimeout(() => {
+      setStatus("success");
+    }, 1200);
+  };
+
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return h("div", { className: "zl-pay-overlay", onClick: (e) => { if (e.target === e.currentTarget) onClose(); } },
+    h("div", { className: "zl-pay-modal", role: "dialog", "aria-modal": "true", "aria-labelledby": "zl-pay-title" },
+      h("button", { className: "zl-pay-close", onClick: onClose, "aria-label": "Close payment scanner" }, "×"),
+      h("div", { className: "zl-pay-badge" }, "SECURE PAYMENT SCANNER"),
+      h("h3", { id: "zl-pay-title", className: "zl-pay-title" }, "Scan & Pay Subscription"),
+      h("p", { className: "zl-pay-subtitle" }, "Scan with PhonePe, Google Pay, Paytm, or any UPI app to activate your plan."),
+
+      // Plan Tabs
+      h("div", { className: "zl-pay-tabs" },
+        h("button", {
+          type: "button",
+          className: "zl-pay-tab" + (currentPlan === "verify" ? " active" : ""),
+          onClick: () => { setCurrentPlan("verify"); setStatus("idle"); }
+        }, "Garaa Verify ($29 / ₹2,499)"),
+        h("button", {
+          type: "button",
+          className: "zl-pay-tab" + (currentPlan === "screen" ? " active" : ""),
+          onClick: () => { setCurrentPlan("screen"); setStatus("idle"); }
+        }, "Garaa Screen ($99 / ₹8,499)")
+      ),
+
+      // Converted Currency Price Breakdown Box
+      h("div", { className: "zl-pay-price-box" },
+        h("div", { className: "zl-pay-price-left" },
+          h("div", { className: "zl-pay-price-label" }, cur.name + " (" + cur.usd + ")"),
+          h("div", { className: "zl-pay-price-rate" }, "Live exchange rate: " + cur.rate)
+        ),
+        h("div", { className: "zl-pay-price-right" },
+          h("div", { className: "zl-pay-amount" }, cur.inr),
+          h("div", { className: "zl-pay-usd" }, "Converted from " + cur.usd)
+        )
+      ),
+
+      // Payment QR Scanner Container with Cyber Laser Beam
+      h("div", { className: "zl-pay-qr-container", title: "Scan with PhonePe, GPay, Paytm or any UPI app" },
+        h("div", { className: "zl-pay-corner zl-pay-corner-tl" }),
+        h("div", { className: "zl-pay-corner zl-pay-corner-tr" }),
+        h("div", { className: "zl-pay-corner zl-pay-corner-bl" }),
+        h("div", { className: "zl-pay-corner zl-pay-corner-br" }),
+        h("div", { className: "zl-pay-scanner-beam" }),
+        h("img", {
+          src: "payment_qr.png",
+          alt: "PhonePe UPI Payment QR Code for " + cur.name,
+          className: "zl-pay-qr-img"
+        })
+      ),
+
+      h("p", { className: "zl-pay-instruct" },
+        "Pay exact amount: ",
+        h("strong", { style: { color: "#0f172a" } }, cur.inr),
+        " (equivalent to ",
+        cur.usd,
+        ")"
+      ),
+
+      // Apps Supported
+      h("div", { className: "zl-pay-apps-pills" },
+        ["PhonePe", "Google Pay", "Paytm", "BHIM / Any UPI"].map((app, i) =>
+          h("span", { key: i, className: "zl-pay-app-pill" }, app)
+        )
+      ),
+
+      // Direct Mobile UPI Intent Link
+      h("a", {
+        href: cur.appLink,
+        className: "zl-pay-btn-app",
+        target: "_blank",
+        rel: "noopener noreferrer"
+      },
+        h("span", null, "📱 Open in PhonePe / UPI App (" + cur.inr + ")")
+      ),
+
+      // UPI ID copy bar
+      h("div", { className: "zl-pay-upi-bar" },
+        h("div", { style: { textAlign: "left" } },
+          h("div", { style: { fontSize: "10px", color: "#64748b", textTransform: "uppercase", letterSpacing: "0.06em" } }, "UPI ID / Payee: PARTH VIJAY GIDDE"),
+          h("div", { style: { fontWeight: "700", color: "#1e293b", marginTop: "2px" } }, "8591250390-2@ybl")
+        ),
+        h("button", {
+          type: "button",
+          className: "zl-pay-upi-copy",
+          onClick: handleCopy
+        }, copied ? "✓ Copied" : "Copy ID")
+      ),
+
+      // Confirmation Section
+      h("div", { className: "zl-pay-confirm-wrap" },
+        status === "success"
+          ? h("div", { className: "zl-pay-success fade-in" },
+              h("div", { style: { fontWeight: "700", marginBottom: "4px" } }, "✓ Payment Recorded Successfully!"),
+              h("p", { style: { margin: "0 0 10px", fontSize: "12px", color: "#166534" } }, "Thank you! Your subscription for " + cur.name + " (" + cur.inr + ") has been authorized."),
+              h("button", {
+                type: "button",
+                className: "zl-pay-btn-confirm",
+                onClick: () => { onClose(); if (onSuccessWorkspace) onSuccessWorkspace(currentPlan); }
+              }, "Launch Workspace Now →")
+            )
+          : h("div", null,
+              h("div", { className: "zl-pay-input-row" },
+                h("input", {
+                  type: "text",
+                  className: "zl-pay-input",
+                  placeholder: "Optional: 12-digit UTR / Ref Number",
+                  value: utr,
+                  onChange: (e) => setUtr(e.target.value)
+                })
+              ),
+              h("button", {
+                type: "button",
+                className: "zl-pay-btn-confirm",
+                disabled: status === "verifying",
+                onClick: handleConfirm
+              }, status === "verifying" ? "Verifying..." : "I Have Paid " + cur.inr + " • Activate Access →")
+            )
+      )
+    )
+  );
+}
+
 function PricingSection({ onOpenScanner, onOpenScreening }) {
   const [activeCard, setActiveCard] = useState(null);
   const [traceNotice, setTraceNotice] = useState(false);
+  const [paymentPlan, setPaymentPlan] = useState(null);
 
   useEffect(() => {
     const handleOutsideClick = (e) => {
@@ -5681,9 +5888,9 @@ function PricingSection({ onOpenScanner, onOpenScreening }) {
         style: { transitionDelay: "320ms" },
         role: "button",
         tabIndex: 0,
-        "aria-label": "Garaa Verify - $29 per month - Identity and document verification - Click to open Scanner",
-        onClick: handleCardClick("verify", onOpenScanner),
-        onKeyDown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpenScanner(); } }
+        "aria-label": "Garaa Verify - $29 per month (₹2,499 INR) - Identity and document verification - Click to pay and activate",
+        onClick: handleCardClick("verify", () => setPaymentPlan("verify")),
+        onKeyDown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setPaymentPlan("verify"); } }
       },
         h("div", { className: "zl-plan-top" },
           h("div", { className: "zl-plan-micro-icon", "aria-hidden": "true" },
@@ -5697,7 +5904,8 @@ function PricingSection({ onOpenScanner, onOpenScreening }) {
         h("h3", { className: "zl-plan-name" }, "GARAA VERIFY"),
         h("div", { className: "zl-plan-price-wrap" },
           h("span", { className: "zl-plan-price" }, "$29"),
-          h("span", { className: "zl-plan-period" }, "/ MONTH")
+          h("span", { className: "zl-plan-period" }, "/ MONTH"),
+          h("span", { className: "zl-plan-inr", title: "Converted price in Indian Rupees" }, "₹2,499")
         ),
         h("div", { className: "zl-plan-reveal" },
           h("div", { className: "zl-plan-divider" }),
@@ -5719,10 +5927,10 @@ function PricingSection({ onOpenScanner, onOpenScreening }) {
           h("button", {
             type: "button",
             className: "zl-plan-btn zl-plan-btn-primary",
-            onClick: handleActionClick(onOpenScanner),
-            "aria-label": "Open Scanner for Garaa Verify"
+            onClick: handleActionClick(() => setPaymentPlan("verify")),
+            "aria-label": "Pay $29 (₹2,499) for Garaa Verify"
           },
-            h("span", null, "OPEN SCANNER"),
+            h("span", null, "PAY $29 (₹2,499)"),
             h("span", { className: "zl-plan-btn-arrow", "aria-hidden": "true" }, "↗")
           )
         )
@@ -5734,9 +5942,9 @@ function PricingSection({ onOpenScanner, onOpenScreening }) {
         style: { transitionDelay: "440ms" },
         role: "button",
         tabIndex: 0,
-        "aria-label": "Garaa Screen - $99 per month - Criminal record screening - Click to view screening solution",
-        onClick: handleCardClick("screen", onOpenScreening),
-        onKeyDown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpenScreening(); } }
+        "aria-label": "Garaa Screen - $99 per month (₹8,499 INR) - Criminal record screening - Click to pay and activate",
+        onClick: handleCardClick("screen", () => setPaymentPlan("screen")),
+        onKeyDown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setPaymentPlan("screen"); } }
       },
         h("div", { className: "zl-plan-top" },
           h("div", { className: "zl-plan-micro-icon", "aria-hidden": "true" },
@@ -5754,7 +5962,8 @@ function PricingSection({ onOpenScanner, onOpenScreening }) {
         h("h3", { className: "zl-plan-name" }, "GARAA SCREEN"),
         h("div", { className: "zl-plan-price-wrap" },
           h("span", { className: "zl-plan-price" }, "$99"),
-          h("span", { className: "zl-plan-period" }, "/ MONTH")
+          h("span", { className: "zl-plan-period" }, "/ MONTH"),
+          h("span", { className: "zl-plan-inr", title: "Converted price in Indian Rupees" }, "₹8,499")
         ),
         h("div", { className: "zl-plan-reveal" },
           h("div", { className: "zl-plan-divider" }),
@@ -5776,10 +5985,10 @@ function PricingSection({ onOpenScanner, onOpenScreening }) {
           h("button", {
             type: "button",
             className: "zl-plan-btn zl-plan-btn-secondary",
-            onClick: handleActionClick(onOpenScreening),
-            "aria-label": "Open Screening for Garaa Screen"
+            onClick: handleActionClick(() => setPaymentPlan("screen")),
+            "aria-label": "Pay $99 (₹8,499) for Garaa Screen"
           },
-            h("span", null, "OPEN SCREENING"),
+            h("span", null, "PAY $99 (₹8,499)"),
             h("span", { className: "zl-plan-btn-arrow", "aria-hidden": "true" }, "↗")
           )
         )
@@ -5842,7 +6051,19 @@ function PricingSection({ onOpenScanner, onOpenScreening }) {
     ),
     h("div", { className: "zl-plan-footnote zl-rev", style: { transitionDelay: "620ms" } },
       "Pricing and service availability are subject to usage limits, verification scope, authorized data-source availability, and applicable service charges."
-    )
+    ),
+    paymentPlan && h(PaymentModal, {
+      plan: paymentPlan,
+      onClose: () => setPaymentPlan(null),
+      onSuccessWorkspace: (selected) => {
+        setPaymentPlan(null);
+        if (selected === "screen") {
+          if (onOpenScreening) onOpenScreening();
+        } else {
+          if (onOpenScanner) onOpenScanner();
+        }
+      }
+    })
   );
 }
 

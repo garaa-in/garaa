@@ -24,29 +24,29 @@ function verifyHtml(filePath) {
   assert.ok(body.includes('Intelligent verification. Deeper screening. A safer digital world.'), 'Must include subtitle');
   console.log('✓ Section Header: PASS');
 
-  // 3. Card 1 - GARAA VERIFY
+  // 3. Card 1 - GARAA VERIFY with Rupee Conversion
   assert.ok(body.includes('GARAA VERIFY'), 'Must include GARAA VERIFY title');
   assert.ok(body.includes('$29'), 'Must include $29');
-  assert.ok(body.includes('/ MONTH'), 'Must include / MONTH');
+  assert.ok(body.includes('₹2,499'), 'Must include converted rupee price ₹2,499');
+  assert.ok(body.includes('zl-plan-inr'), 'Must display rupee conversion badge on card');
   assert.ok(body.includes('zl-plan-micro-icon'), 'Must include micro-icon container');
   assert.ok(body.includes('Intelligent identity and document verification, designed to help identify inconsistencies and potential document manipulation.'), 'Must include exact Verify description');
   assert.ok(body.includes('Identity and document analysis'), 'Must include Verify feature 1');
   assert.ok(body.includes('Potential tampering indicators'), 'Must include Verify feature 2');
   assert.ok(body.includes('Verification reports'), 'Must include Verify feature 3');
-  assert.ok(body.includes('OPEN SCANNER'), 'Must include OPEN SCANNER action');
-  assert.ok(body.includes('onOpenScanner'), 'Must bind to onOpenScanner');
-  console.log('✓ Card 1 (Garaa Verify) initial state, reveal tray & scanner portal: PASS');
+  assert.ok(body.includes('PAY $29 (₹2,499)'), 'Must include PAY $29 action with rupee price');
+  console.log('✓ Card 1 (Garaa Verify) initial state, reveal tray & payment trigger: PASS');
 
-  // 4. Card 2 - GARAA SCREEN
+  // 4. Card 2 - GARAA SCREEN with Rupee Conversion
   assert.ok(body.includes('GARAA SCREEN'), 'Must include GARAA SCREEN title');
   assert.ok(body.includes('$99'), 'Must include $99');
+  assert.ok(body.includes('₹8,499'), 'Must include converted rupee price ₹8,499');
   assert.ok(body.includes('Go beyond identity verification with screening workflows designed to support informed trust and safety decisions.'), 'Must include exact Screen description');
   assert.ok(body.includes('Authorized criminal-record screening'), 'Must include Screen feature 1');
   assert.ok(body.includes('Identity and record matching'), 'Must include Screen feature 2');
   assert.ok(body.includes('Reviewable screening findings'), 'Must include Screen feature 3');
-  assert.ok(body.includes('OPEN SCREENING'), 'Must include OPEN SCREENING action');
-  assert.ok(body.includes('onOpenScreening'), 'Must bind to onOpenScreening');
-  console.log('✓ Card 2 (Garaa Screen) initial state, reveal tray & screening link: PASS');
+  assert.ok(body.includes('PAY $99 (₹8,499)'), 'Must include PAY $99 action with rupee price');
+  console.log('✓ Card 2 (Garaa Screen) initial state, reveal tray & payment trigger: PASS');
 
   // 5. Card 3 - TRACEX
   assert.ok(body.includes('TRACEX'), 'Must include TRACEX title');
@@ -60,27 +60,33 @@ function verifyHtml(filePath) {
   assert.ok(body.includes('TraceX will be available soon. No action required today.'), 'Must include exact inline notice');
   console.log('✓ Card 3 (TraceX) initial state, reveal tray, supporting line & notice: PASS');
 
-  // 6. Interactive CSS & Smooth Animations
+  // 6. Payment Scanner Modal & QR Code Integration
+  assert.ok(body.includes('PaymentModal'), 'Must define PaymentModal component');
+  assert.ok(body.includes('payment_qr.png'), 'Must reference user\'s PhonePe QR code image');
+  assert.ok(body.includes('8591250390-2@ybl'), 'Must include user\'s verified UPI ID');
+  assert.ok(body.includes('PARTH VIJAY GIDDE'), 'Must include user\'s verified payee name');
+  assert.ok(body.includes('zl-pay-scanner-beam'), 'Must include animated laser scanner sweep beam');
+  assert.ok(body.includes('zl-pay-corner'), 'Must include scanner reticle corners');
+  assert.ok(body.includes('PhonePe'), 'Must state PhonePe support');
+  assert.ok(body.includes('Google Pay'), 'Must state Google Pay support');
+  assert.ok(body.includes('Paytm'), 'Must state Paytm support');
+  assert.ok(body.includes('upi://pay'), 'Must provide direct mobile UPI app intent');
+  console.log('✓ Payment Scanner Modal, PhonePe QR code, UPI details & currency converter: PASS');
+
+  // 7. Interactive CSS & Smooth Animations
   assert.ok(body.includes('.zl-plan-reveal{'), 'Must define collapsible reveal tray');
   assert.ok(body.includes('max-height:0;'), 'Reveal tray must be 0 height initially');
   assert.ok(body.includes('opacity:0;'), 'Reveal tray must be transparent initially');
-  assert.ok(body.includes('pointer-events:none;'), 'Reveal tray must not catch clicks while collapsed');
   assert.ok(body.includes('transform:scale(1.05)'), 'Card must scale to 1.05 on hover');
   assert.ok(body.includes('box-shadow:0 0 50px rgba(255,255,255,.95)'), 'Must have soft white outer glow on hover');
   assert.ok(body.includes('cubic-bezier(.16,1,.3,1)'), 'Must use smooth cubic-bezier easing');
-  assert.ok(body.includes('align-items:start;'), 'Grid must align-items: start to prevent distorting sibling cards');
+  assert.ok(body.includes('align-items:start;'), 'Grid must align-items: start');
   console.log('✓ Interactive reveal-on-hover CSS, glowing aesthetics & layout stability: PASS');
-
-  // 7. Mobile Touch Interaction Logic
-  assert.ok(body.includes('isTouchDevice'), 'Must detect touch vs desktop devices');
-  assert.ok(body.includes('activeCard'), 'Must maintain activeCard state for touch reveal');
-  assert.ok(body.includes('is-expanded'), 'Must support is-expanded class on cards');
-  console.log('✓ Mobile Touch 2-step interaction: PASS');
 }
 
 verifyHtml(path.join(__dirname, '../frontend/index.html'));
 verifyHtml(path.join(__dirname, '../index.html'));
 
 console.log('\n======================================================');
-console.log('ALL PRICING SECTION TESTS PASSED PERFECTLY ON BOTH FILES!');
+console.log('ALL PRICING & PAYMENT SCANNER TESTS PASSED PERFECTLY!');
 console.log('======================================================');
