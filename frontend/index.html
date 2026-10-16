@@ -5665,8 +5665,14 @@ function Landing({ onStart, onGo }) {
   useEffect(() => {
     const els = document.querySelectorAll(".zl-rev");
     if (!("IntersectionObserver" in window)) { els.forEach((e) => e.classList.add("zl-in")); return; }
-    const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add("zl-in"); io.unobserve(e.target); } }), { threshold: 0.12 });
+    const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add("zl-in"); io.unobserve(e.target); } }), { threshold: 0.04 });
     els.forEach((e) => io.observe(e));
+    setTimeout(() => {
+      els.forEach((e) => {
+        const r = e.getBoundingClientRect();
+        if (r.top < window.innerHeight && r.bottom > 0) e.classList.add("zl-in");
+      });
+    }, 400);
     return () => io.disconnect();
   }, []);
   const onMove = (e) => {
