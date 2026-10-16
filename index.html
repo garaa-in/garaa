@@ -1352,6 +1352,7 @@ function extractDocumentDetails(rawText, docId, docName) {
   let docType = (docName && docName !== "Other Documents") ? docName : "Official Credential";
   let authority = "Issuing Government Authority";
 
+  // 1. Identify Document Type & Authority based on official government identifiers
   if (/UIDAI|AADHAAR|AADHAR|आधार|\b\d{4}\s\d{4}\s\d{4}\b/i.test(u) || docId === "aadhaar") {
     docType = "Aadhaar Card";
     authority = "Unique Identification Authority of India (UIDAI)";
@@ -1361,31 +1362,56 @@ function extractDocumentDetails(rawText, docId, docName) {
   } else if (/PASSPORT|REPUBLIC OF INDIA|P<IND|\b[A-Z]\d{7}\b/i.test(u) || docId === "passport") {
     docType = "Passport";
     authority = "Ministry of External Affairs, Govt. of India";
-  } else if (/DRIVING|LICENCE|LICENSE|TRANSPORT/i.test(u) || docId === "driving") {
+  } else if (/DRIVING|LICENCE|LICENSE|TRANSPORT|SARATHI|PARIVAHAN/i.test(u) || docId === "driving") {
     docType = "Driving Licence";
     authority = "Ministry of Road Transport & Highways";
-  } else if (/VOTER|ELECTION COMMISSION|EPIC/i.test(u) || docId === "voter") {
+  } else if (/VOTER|ELECTION COMMISSION|EPIC|NIRVACHAN/i.test(u) || docId === "voter") {
     docType = "Voter Identity Card (EPIC)";
     authority = "Election Commission of India";
-  } else if (/UNIVERSITY|COLLEGE|DEGREE|MARKSHEET|CERTIFICATE|EDUCATION|BOARD/i.test(u) || docId === "edu") {
+  } else if (/UNIVERSITY|COLLEGE|DEGREE|MARKSHEET|CERTIFICATE|EDUCATION|BOARD|COUNCIL/i.test(u) || docId === "edu") {
     docType = "Academic / Educational Certificate";
     authority = "Recognized University / Education Board";
   }
 
-  // Name extraction
+  // 2. Exact Name Extraction based on Government Layout Rules
   let name = null;
-  const nameLabel = t.match(/(?:Name|Full Name|Holder Name|Student Name|Candidate Name|नाम)[:\s]+([A-Za-z .]{3,50})/i);
-  if (nameLabel) {
-    name = nameLabel[1].trim().replace(/\s+/g, " ");
-  } else {
-    const parthMatch = u.match(/\bPARTH(\s+[A-Z]+){1,3}\b/);
-    if (parthMatch) {
-      name = parthMatch[0].toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
-    } else {
-      for (const line of lines) {
-        if (/^(GOVERNMENT|GOVT|UNIQUE|INDIA|MERA|AADHAAR|INCOME|PERMANENT|REPUBLIC|DEPT|DEPARTMENT|UNION|ELECTION|MINISTRY|TRANSPORT|UNIVERSITY|BOARD|STATE)/i.test(line)) continue;
-        if (/\d/.test(line)) continue;
-        const words = line.split(/\s+/).filter(w => /^[A-Za-z]{3,}$/.test(w));
+  let fatherName = null;
+
+  // A. Passport MRZ (ICAO 9303 standard): P<IND[SURNAME]<<[GIVEN_NAMES]
+  const mrzMatch = u.match(/P<([A-Z]{3})([A-Z]+)<<([A-Z<]+)/);
+  if (mrzMatch) {
+    const surname = mrzMatch[2].replace(/<+/g, " ").trim();
+    const givenName = mrzMatch[3].replace(/<+/g, " ").trim();
+    name = (givenName + " " + surname).trim();
+  }
+
+  // B. Explicit government field labels (English & Devanagari)
+  if (!name) {
+    const nameLabel = t.match(/(?:Name|Full Name|Holder Name|Cardholder Name|Student Name|Candidate Name|Given Name|Elector Name|नाम|नाव)[:\s]+([A-Za-z .]{3,50})/i);
+    if (nameLabel) {
+      const candidate = nameLabel[1].trim().replace(/\s+/g, " ");
+      if (!/^(Father|Mother|Husband|Date|Birth|DOB|Address|Gender|Sex|Permanent|Republic|India|Government|Signature)/i.test(candidate)) {
+        name = candidate;
+      }
+    }
+  }
+
+  // C. Certificates / Degrees ("certify that [Name]")
+  if (!name) {
+    const certMatch = t.match(/(?:certify that|certifies that|certified that|awarded to|presented to)\s+([A-Za-z .]{3,45})/i);
+    if (certMatch) {
+      name = certMatch[1].trim();
+    }
+  }
+
+  // D. Aadhaar Government Layout: Name is immediately above the DOB / Year of Birth line
+  if (!name && (docType.includes("Aadhaar") || docId === "aadhaar")) {
+    const dobIndex = lines.findIndex(l => /(?:DOB|Date of Birth|Birth|जन्म|Year of Birth)/i.test(l));
+    if (dobIndex > 0) {
+      for (let offset = 1; offset <= 3 && dobIndex - offset >= 0; offset++) {
+        const candidateLine = lines[dobIndex - offset].replace(/^[0-9\W]+/, "").trim();
+        if (/^(GOVERNMENT|GOVT|INDIA|UNIQUE|AUTHORITY|IDENTIFICATION|ENROLMENT|MERA|AADHAAR|TO|HELP|BHARAT|SARKAR)/i.test(candidateLine)) continue;
+        const words = candidateLine.split(/\s+/).filter(w => /^[A-Za-z]{2,}$/.test(w));
         if (words.length >= 2 && words.length <= 4) {
           name = words.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
           break;
@@ -1394,14 +1420,51 @@ function extractDocumentDetails(rawText, docId, docName) {
     }
   }
 
-  // Document Number extraction
+  // E. PAN Card Government Layout: Name is between PAN number and Father's Name / DOB
+  if (!name && (docType.includes("PAN") || docId === "pan")) {
+    const panIdx = lines.findIndex(l => /\b[A-Z]{5}[0-9]{4}[A-Z]\b/.test(l.toUpperCase()));
+    if (panIdx >= 0) {
+      for (let offset = 1; offset <= 3 && panIdx + offset < lines.length; offset++) {
+        const candidateLine = lines[panIdx + offset].trim();
+        if (/^(INCOME|TAX|DEPT|GOVT|INDIA|FATHER|PERMANENT|ACCOUNT|SIGNATURE|AYAKAR)/i.test(candidateLine)) continue;
+        if (/\d/.test(candidateLine)) continue;
+        const words = candidateLine.split(/\s+/).filter(w => /^[A-Za-z]{2,}$/.test(w));
+        if (words.length >= 2 && words.length <= 4) {
+          name = words.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
+          break;
+        }
+      }
+    }
+  }
+
+  // F. Fallback general name search across lines
+  if (!name) {
+    for (const line of lines) {
+      if (/^(GOVERNMENT|GOVT|UNIQUE|INDIA|MERA|AADHAAR|INCOME|PERMANENT|REPUBLIC|DEPT|DEPARTMENT|UNION|ELECTION|MINISTRY|TRANSPORT|UNIVERSITY|BOARD|STATE|DIRECTORATE|CONTROLLER|OFFICE)/i.test(line)) continue;
+      if (/\d/.test(line)) continue;
+      if (/^(MALE|FEMALE|TRANSGENDER|DATE|BIRTH|YEAR|SIGNATURE|HOLDER|PHOTO|CARD|IDENTITY|VALID|EXPIRES)/i.test(line)) continue;
+      const words = line.split(/\s+/).filter(w => /^[A-Za-z]{3,}$/.test(w));
+      if (words.length >= 2 && words.length <= 4) {
+        name = words.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
+        break;
+      }
+    }
+  }
+
+  // Father's Name / Guardian Extraction
+  const fatherMatch = t.match(/(?:Father's Name|Father Name|Father|पिता|S\/O|D\/O|W\/O|C\/O)[:\s]+([A-Za-z .]{3,45})/i);
+  if (fatherMatch) {
+    fatherName = fatherMatch[1].trim().replace(/\s+/g, " ");
+  }
+
+  // 3. Exact Government Document Number Extraction
   let docNum = null;
   const aadhMatch = t.match(/\b\d{4}\s\d{4}\s\d{4}\b/) || t.match(/\b\d{12}\b/);
   const panMatch = t.match(/\b[A-Z]{5}[0-9]{4}[A-Z]\b/);
   const passMatch = t.match(/\b[A-Z][0-9]{7}\b/);
   const dlMatch = t.match(/\b[A-Z]{2}[- ]?[0-9]{2}[- ]?[0-9]{4}[- ]?[0-9]{7}\b/) || t.match(/\b[A-Z]{2}[0-9A-Z -]{11,16}\b/);
-  const voterMatch = t.match(/\b[A-Z]{3}[0-9]{7}\b/);
-  const certMatch = t.match(/\b(?:Roll|Seat|Reg|Cert|Serial|Certificate|Ref)[^0-9A-Z]{0,8}([0-9A-Z/-]{5,20})\b/i);
+  const voterMatch = t.match(/\b[A-Z]{3}[0-9]{7}\b/) || t.match(/\b[A-Z]{2,3}\/[0-9]{2,3}\/[0-9]{3,6}\b/);
+  const certMatch = t.match(/\b(?:Roll|Seat|Reg|Registration|Enrollment|Cert|Serial|Certificate|Ref)[^0-9A-Z]{0,8}([0-9A-Z/-]{5,20})\b/i);
 
   if (docType.includes("Aadhaar") && aadhMatch) {
     const d = aadhMatch[0].replace(/\s+/g, "");
@@ -1426,13 +1489,14 @@ function extractDocumentDetails(rawText, docId, docName) {
     docNum = voterMatch[0];
   }
 
-  // DOB
+  // 4. Exact Date of Birth (DOB)
   let dob = null;
-  const dobMatch = t.match(/(?:DOB|Date of Birth|Birth|D\.O\.B|जन्म)[^0-9]{0,12}(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{4})/i)
-    || t.match(/\b(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{4})\b/);
+  const dobMatch = t.match(/(?:DOB|Date of Birth|Birth Date|Birth|D\.O\.B|जन्म\s*तिथि)[:\s\-\.]*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{4})/i)
+    || t.match(/(?:Year of Birth|जन्म\s*वर्ष)[:\s\-\.]*(\d{4})/i)
+    || t.match(/\b(0[1-9]|[12][0-9]|3[01])[\/\-.](0[1-9]|1[0-2])[\/\-.](19[5-9]\d|20[0-2]\d)\b/);
   if (dobMatch) dob = dobMatch[1];
 
-  // Gender
+  // 5. Gender
   let gender = null;
   const genMatch = t.match(/\b(Male|Female|Transgender|MALE|FEMALE|पुरुष|महिला)\b/i);
   if (genMatch) {
@@ -1440,19 +1504,20 @@ function extractDocumentDetails(rawText, docId, docName) {
     gender = g.includes("fem") || g.includes("महि") ? "Female" : g.includes("trans") ? "Transgender" : "Male";
   }
 
-  // Issue / Expiry
+  // 6. Issue & Expiry Dates
   let issueDate = null;
-  const issMatch = t.match(/(?:Issue|Issued|Date of Issue)[^0-9]{0,12}(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{4})/i);
+  const issMatch = t.match(/(?:Issue|Issued|Date of Issue|जारी\s*करने\s*की\s*तिथि)[:\s\-\.]*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{4})/i);
   if (issMatch) issueDate = issMatch[1];
 
   let expiryDate = null;
-  const expMatch = t.match(/(?:Expiry|Expires|Valid Till|Valid Upto)[^0-9]{0,12}(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{4})/i);
+  const expMatch = t.match(/(?:Expiry|Expires|Valid Till|Valid Upto|Validity|समाप्ति\s*की\s*तिथि)[:\s\-\.]*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{4})/i);
   if (expMatch) expiryDate = expMatch[1];
 
   return {
     docType,
     authority,
     name: name || (t.length > 20 ? "Verified Subject" : "Official Credential Holder"),
+    fatherName,
     docNum: docNum || (docId === "aadhaar" ? "XXXX XXXX 9821" : docId === "pan" ? "XXXXX4920X" : "VERIFIED-RECORD-ID"),
     dob: dob || (t.length > 20 ? "Verified on Record" : "Not Specified"),
     gender: gender || "Specified",
@@ -2022,7 +2087,7 @@ function UploadZone({ onFile, onCamera, docName }) {
       type: "button",
       onClick: (e) => { e.stopPropagation(); onCamera(); },
       className: "w-full py-3 px-4 rounded-xl bg-white/10 hover:bg-white/15 text-[#0B1220] text-xs font-bold inline-flex items-center justify-center gap-2 border border-white/10 shadow-sm transition-all"
-    }, h(Icon, { name: "Camera", size: 16, className: "accent-color" }), " Use Full-Screen Camera to Capture ", docName)
+    }, h(Icon, { name: "Camera", size: 16, className: "accent-color" }), " Use Camera to Capture ", docName)
   );
 }
 
@@ -2920,97 +2985,40 @@ function SmartScanPage({ pushToast, onUseForIdentity, onScanComplete }) {
         h("button", { onClick: () => { setCamErr(null); startCamera(); }, className: "flex-1 rounded-xl py-2.5 accent-grad text-white text-xs font-semibold" }, "Retry"),
         h("button", { onClick: () => { setCamErr(null); if (inputRef.current) inputRef.current.click(); }, className: "flex-1 rounded-xl py-2.5 bg-slate-100 text-slate-700 text-xs font-semibold" }, "Upload Image / PDF"),
         h("button", { onClick: () => setCamErr(null), className: "rounded-xl px-3 py-2.5 bg-slate-100 text-slate-500 text-xs" }, "Close"))),
-    cameraOpen && h("div", { className: "garaa-camera-fullscreen" },
-      // Top HUD bar
-      h("div", { className: "relative z-30 flex items-center justify-between px-4 sm:px-6 py-3.5 bg-gradient-to-b from-black/95 via-black/75 to-transparent backdrop-blur-md border-b border-white/10" },
-        h("div", { className: "flex items-center gap-3" },
-          h("div", { className: "w-9 h-9 rounded-xl bg-cyan-500/15 border border-cyan-400/30 flex items-center justify-center text-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.3)] shrink-0" },
-            h(Icon, { name: "Scan", size: 18 })
-          ),
+    cameraOpen && h("div", { className: "fixed inset-0 z-[80] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 sm:p-5" },
+      h("div", { className: "w-full max-w-lg rounded-3xl bg-white p-4 sm:p-5 shadow-2xl relative" },
+        h("div", { className: "flex items-center justify-between mb-3" },
           h("div", null,
-            h("div", { className: "text-xs font-extrabold tracking-wider text-white font-mono flex items-center gap-2" },
-              h("span", { className: "w-2 h-2 rounded-full bg-cyan-400 animate-ping" }),
-              "GARAA CYBER-OPTIC SCANNER · 4K FULL-SCREEN HUD"
+            h("h3", { style: disp, className: "font-bold text-[#0B1220]" }, "Capture document"),
+            h("p", { className: "text-xs text-slate-500 mt-0.5" }, "Hold any ID or document in view — it is detected and cropped automatically")
+          ),
+          h("button", { onClick: closeCamera, className: "w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 hover:bg-slate-200 transition-colors" }, h(Icon, { name: "X", size: 15 }))
+        ),
+        h("div", { className: "relative rounded-2xl overflow-hidden bg-slate-900 aspect-[4/3]" },
+          h("video", { ref: videoRef, muted: true, playsInline: true, className: "w-full h-full object-cover", style: { transform: review ? "scale(1.05)" : "scale(1)", transition: "transform 1.6s cubic-bezier(.22,1,.36,1)" } }),
+          h("canvas", { ref: overlayRef, className: "absolute inset-0 w-full h-full pointer-events-none", style: { opacity: review ? 0 : 1, transition: "opacity .45s ease .3s" } }),
+          !review && ui.phase === "searching" && h("div", { className: "zy-sweep" }),
+          !review && h("div", { className: "zy-chip" },
+            h("b", null,
+              h("span", { className: `w-1.5 h-1.5 rounded-full ${ui.phase === "searching" ? "bg-sky-400 pulse-glow" : "bg-cyan-500"}` }),
+              (ui.phase === "aligning" ? (ui.hint || "Aligning document...") : ZY_STATE[ui.phase] || "Aligning document...")
             ),
-            h("div", { className: "text-[10px] text-slate-400 font-mono" }, "AI Real-Time Edge Geometry & Auto-Capture")
-          )
-        ),
-        h("div", { className: "flex items-center gap-2" },
-          h("button", {
-            type: "button",
-            onClick: closeCamera,
-            className: "w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all border border-white/15",
-            "aria-label": "Close Camera"
-          }, h(Icon, { name: "X", size: 18 }))
-        )
-      ),
-
-      // Center Viewfinder: takes 100% full screen
-      h("div", { className: "relative flex-1 w-full h-full overflow-hidden bg-black flex items-center justify-center" },
-        h("video", {
-          ref: videoRef,
-          muted: true,
-          playsInline: true,
-          className: "absolute inset-0 w-full h-full object-cover",
-          style: { transform: review ? "scale(1.04)" : "scale(1)", transition: "transform 1.6s cubic-bezier(.22,1,.36,1)" }
-        }),
-        h("canvas", {
-          ref: overlayRef,
-          className: "absolute inset-0 w-full h-full pointer-events-none",
-          style: { opacity: review ? 0 : 1, transition: "opacity .45s ease .3s" }
-        }),
-        !review && ui.phase === "searching" && h("div", { className: "zy-sweep" }),
-        !review && h("div", { className: "zy-chip" },
-          h("b", null,
-            h("span", { className: `w-1.5 h-1.5 rounded-full ${ui.phase === "searching" ? "bg-sky-400 pulse-glow" : "bg-cyan-500"}` }),
-            (ui.phase === "aligning" ? (ui.hint || "Aligning document...") : ZY_STATE[ui.phase] || "Aligning document...")
+            ui.phase !== "searching" && h("i", null, h("s", { style: { width: `${Math.round(ui.p * 100)}%` } }))
           ),
-          ui.phase !== "searching" && h("i", null, h("s", { style: { width: `${Math.round(ui.p * 100)}%` } }))
+          review && h(ZyExtract, { review, verifying, onView: (kk) => setReview({ ...review, view: kk }) }),
+          review && verifying && h(ZyVerifyTransition, { review, onDone: finishReviewed })
         ),
-        // Alignment Guide Frame
-        !review && h("div", { className: "absolute inset-[6%] sm:inset-[10%] rounded-3xl border-2 border-cyan-400/40 pointer-events-none flex flex-col justify-between p-4 shadow-[0_0_25px_rgba(34,211,238,0.18)]" },
-          h("div", { className: "flex justify-between text-[10px] font-mono text-cyan-300 font-bold tracking-wider bg-slate-950/70 px-2 py-1 rounded border border-cyan-500/30" },
-            h("span", null, "⌖ FRAME: 85.60 × 53.98mm"),
-            h("span", null, "ISO/IEC 7810 ID-1")
-          ),
-          h("div", { className: "flex justify-between text-[10px] font-mono text-cyan-300 font-bold tracking-wider bg-slate-950/70 px-2 py-1 rounded border border-cyan-500/30" },
-            h("span", null, "AUTO-GEOMETRY LOCK"),
-            h("span", null, "HOLD STEADY")
+        review && review.qi && review.qi.length > 0 && h("div", { className: "mt-3 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800" },
+          h("b", null, "UNABLE TO VERIFY"), " — ", review.qi.join(" "), " This is a capture-quality issue, not a fake-document result. Please retake."
+        ),
+        h("div", { className: "flex gap-2 mt-4" },
+          review ? h(F, null,
+            h("button", { onClick: () => { if (videoRef.current) videoRef.current.play(); setReview(null); }, className: "flex-1 rounded-xl py-3 bg-slate-100 text-slate-700 text-sm font-semibold hover:bg-slate-200" }, "Retake"),
+            h("button", { onClick: useReviewed, disabled: verifying, className: "flex-1 rounded-xl py-3 accent-grad text-white text-sm font-semibold inline-flex items-center justify-center gap-2" }, h(Icon, { name: "CheckCircle2", size: 16 }), (review && review.qi && review.qi.length ? " Continue anyway" : " Use scanned document"))
+          ) : h(F, null,
+            h("button", { onClick: closeCamera, className: "flex-1 rounded-xl py-3 bg-slate-100 text-slate-700 text-sm font-semibold hover:bg-slate-200" }, "Cancel"),
+            h("button", { onClick: manualCapture, className: "flex-1 rounded-xl py-3 accent-grad text-white text-sm font-semibold inline-flex items-center justify-center gap-2" }, h(Icon, { name: "Camera", size: 16 }), " Capture & scan")
           )
-        ),
-        review && h(ZyExtract, { review, verifying, onView: (kk) => setReview({ ...review, view: kk }) }),
-        review && verifying && h(ZyVerifyTransition, { review, onDone: finishReviewed })
-      ),
-
-      // Bottom Control Deck
-      h("div", { className: "relative z-30 px-4 sm:px-6 py-4 bg-gradient-to-t from-black/95 via-black/80 to-transparent backdrop-blur-md flex flex-col items-center gap-3 border-t border-white/10", style: { paddingBottom: "max(1.2rem, env(safe-area-inset-bottom))" } },
-        review && review.qi && review.qi.length > 0 && h("div", { className: "w-full max-w-md rounded-xl bg-amber-500/10 border border-amber-400/30 px-3.5 py-2 text-xs text-amber-200 text-center font-medium backdrop-blur-sm" },
-          h("b", null, "CAPTURE NOTICE: "), review.qi.join(" ")
-        ),
-        review ? h("div", { className: "flex items-center justify-center gap-4 w-full max-w-md" },
-          h("button", {
-            type: "button",
-            onClick: () => { if (videoRef.current) videoRef.current.play(); setReview(null); },
-            className: "flex-1 py-3.5 px-5 rounded-2xl bg-white/10 hover:bg-white/15 text-white text-sm font-bold border border-white/15 transition-all text-center"
-          }, "Retake Frame"),
-          h("button", {
-            type: "button",
-            onClick: useReviewed,
-            disabled: verifying,
-            className: "flex-1 py-3.5 px-5 rounded-2xl accent-grad text-white text-sm font-bold shadow-lg shadow-cyan-500/30 flex items-center justify-center gap-2 transition-all accent-glow"
-          }, h(Icon, { name: "CheckCircle2", size: 18 }), review && review.qi && review.qi.length ? "Continue Anyway" : "Use Document")
-        ) : h("div", { className: "flex items-center justify-between w-full max-w-md gap-4" },
-          h("button", {
-            type: "button",
-            onClick: closeCamera,
-            className: "px-4 py-3 rounded-2xl bg-white/10 hover:bg-white/15 text-white text-xs font-semibold border border-white/10 transition-all"
-          }, "Cancel"),
-          h("button", {
-            type: "button",
-            onClick: manualCapture,
-            className: "flex-1 py-3.5 px-6 rounded-2xl bg-gradient-to-r from-cyan-500 via-sky-500 to-indigo-600 hover:opacity-95 text-white text-sm font-extrabold shadow-[0_0_25px_rgba(6,182,212,0.4)] flex items-center justify-center gap-2 border border-cyan-300/40 uppercase tracking-wider transition-all"
-          }, h(Icon, { name: "Camera", size: 18 }), " Capture & Scan"),
-          h("div", { className: "w-12 text-center text-[10px] text-cyan-400 font-mono font-bold" }, "AUTO-ON")
         )
       )
     )
@@ -3028,11 +3036,7 @@ function VerifyDocCamera({ docName, onCapture, onClose }) {
     const startCam = async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: { ideal: "environment" },
-            width: { ideal: 1920 },
-            height: { ideal: 1080 }
-          },
+          video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } },
           audio: false
         });
         if (!active) {
@@ -3078,83 +3082,37 @@ function VerifyDocCamera({ docName, onCapture, onClose }) {
     }, "image/jpeg", 0.95);
   };
 
-  return h("div", { className: "garaa-camera-fullscreen" },
-    // Top HUD Bar
-    h("div", { className: "relative z-30 flex items-center justify-between px-4 sm:px-6 py-3.5 bg-gradient-to-b from-black/95 via-black/75 to-transparent backdrop-blur-md border-b border-white/10" },
-      h("div", { className: "flex items-center gap-3" },
-        h("div", { className: "w-9 h-9 rounded-xl bg-cyan-500/15 border border-cyan-400/30 flex items-center justify-center text-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.3)] shrink-0" },
-          h(Icon, { name: "Scan", size: 18 })
-        ),
+  return h("div", { className: "fixed inset-0 z-[80] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 sm:p-5" },
+    h("div", { className: "w-full max-w-lg rounded-3xl bg-white p-4 sm:p-5 shadow-2xl relative" },
+      h("div", { className: "flex items-center justify-between mb-3" },
         h("div", null,
-          h("div", { className: "text-xs font-extrabold tracking-wider text-white font-mono flex items-center gap-2" },
-            h("span", { className: "w-2 h-2 rounded-full bg-cyan-400 animate-ping" }),
-            `GARAA CYBER-OPTIC SCANNER · ${docName.toUpperCase()}`
-          ),
-          h("div", { className: "text-[10px] text-slate-400 font-mono" }, "4K Full-Screen Viewfinder · Auto-Calibration HUD")
-        )
-      ),
-      h("button", {
-        type: "button",
-        onClick: onClose,
-        className: "w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all border border-white/15",
-        "aria-label": "Close Camera"
-      }, h(Icon, { name: "X", size: 18 }))
-    ),
-
-    // Center Viewfinder: 100% full screen
-    h("div", { className: "relative flex-1 w-full h-full overflow-hidden bg-black flex items-center justify-center" },
-      h("video", {
-        ref: videoRef,
-        muted: true,
-        playsInline: true,
-        className: "absolute inset-0 w-full h-full object-cover"
-      }),
-      // Futuristic laser line & grid
-      h("div", { className: "scan-grid opacity-35" }),
-      h("div", { className: "forensic-laser-line" }),
-      h("div", { className: "forensic-laser-trail" }),
-
-      // Alignment Guide Frame (ID card aspect ratio)
-      h("div", { className: "absolute inset-[6%] sm:inset-[10%] rounded-3xl border-2 border-cyan-400/50 pointer-events-none flex flex-col justify-between p-4 sm:p-6 shadow-[0_0_25px_rgba(34,211,238,0.2)]" },
-        // Corner brackets
-        h("div", { className: "flex justify-between items-start" },
-          h("div", { className: "text-[10px] font-mono text-cyan-300 font-bold bg-slate-950/80 px-2 py-1 rounded border border-cyan-500/40" }, "⌖ [TL-CALIB 0.0]"),
-          h("div", { className: "text-[10px] font-mono text-cyan-300 font-bold bg-slate-950/80 px-2 py-1 rounded border border-cyan-500/40" }, "[TR-CALIB 1.0] ⌖")
+          h("h3", { style: disp, className: "font-bold text-[#0B1220]" }, `Capture ${docName}`),
+          h("p", { className: "text-xs text-slate-500 mt-0.5" }, "Align your document within the frame — tap capture to verify")
         ),
-        // Centered targeting reticle
-        h("div", { className: "self-center text-center pointer-events-none" },
-          h("div", { className: "w-16 h-16 mx-auto rounded-full border border-dashed border-cyan-400/60 animate-spin mb-2", style: { animationDuration: "10s" } }),
-          h("div", { className: "text-xs font-mono font-bold text-cyan-300 bg-slate-950/85 px-3 py-1.5 rounded-full border border-cyan-400/40 inline-block shadow-lg" },
-            `ALIGN ${docName.toUpperCase()} WITHIN FRAME`
+        h("button", { onClick: onClose, className: "w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 hover:bg-slate-200 transition-colors" }, h(Icon, { name: "X", size: 15 }))
+      ),
+      h("div", { className: "relative rounded-2xl overflow-hidden bg-slate-900 aspect-[4/3]" },
+        h("video", { ref: videoRef, muted: true, playsInline: true, className: "w-full h-full object-cover" }),
+        h("div", { className: "scan-grid opacity-30" }),
+        h("div", { className: "forensic-laser-line" }),
+        h("div", { className: "forensic-laser-trail" }),
+        h("div", { className: "absolute inset-[10%] rounded-2xl border-2 border-cyan-400/60 pointer-events-none flex flex-col justify-between p-3 shadow-[0_0_20px_rgba(34,211,238,0.2)]" },
+          h("div", { className: "flex justify-between items-start text-[9px] font-mono text-cyan-300 font-bold" },
+            h("span", { className: "bg-slate-950/80 px-1.5 py-0.5 rounded border border-cyan-500/30" }, "⌖ ALIGN CARD"),
+            h("span", { className: "bg-slate-950/80 px-1.5 py-0.5 rounded border border-cyan-500/30" }, "ISO ID-1 ⌖")
+          ),
+          h("div", { className: "flex justify-between items-end text-[9px] font-mono text-cyan-300 font-bold" },
+            h("span", { className: "bg-slate-950/80 px-1.5 py-0.5 rounded border border-cyan-500/30" }, "⌖ SENSOR READY"),
+            h("span", { className: "bg-slate-950/80 px-1.5 py-0.5 rounded border border-cyan-500/30" }, "STEADY ⌖")
           )
         ),
-        // Bottom corner brackets
-        h("div", { className: "flex justify-between items-end" },
-          h("div", { className: "text-[10px] font-mono text-cyan-300 font-bold bg-slate-950/80 px-2 py-1 rounded border border-cyan-500/40" }, "⌖ [BL-CHECKSUM]"),
-          h("div", { className: "text-[10px] font-mono text-cyan-300 font-bold bg-slate-950/80 px-2 py-1 rounded border border-cyan-500/40" }, "[BR-SECURITY] ⌖")
-        )
+        error && h("div", { className: "absolute inset-x-3 top-4 z-40 p-3 rounded-xl bg-rose-950/90 border border-rose-500 text-rose-200 text-xs text-center backdrop-blur-md" }, error)
       ),
-
-      error && h("div", { className: "absolute inset-x-4 top-20 z-40 p-4 rounded-2xl bg-rose-950/90 border border-rose-500 text-rose-200 text-xs text-center backdrop-blur-md" },
-        error
-      )
-    ),
-
-    // Bottom Control Deck
-    h("div", { className: "relative z-30 px-4 sm:px-6 py-4 bg-gradient-to-t from-black/95 via-black/80 to-transparent backdrop-blur-md flex flex-col items-center gap-3 border-t border-white/10", style: { paddingBottom: "max(1.2rem, env(safe-area-inset-bottom))" } },
-      h("div", { className: "flex items-center justify-between w-full max-w-md gap-4" },
-        h("button", {
-          type: "button",
-          onClick: onClose,
-          className: "px-4 py-3 rounded-2xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold border border-white/10 transition-all"
-        }, "Cancel"),
-        h("button", {
-          type: "button",
-          onClick: handleCapture,
-          disabled: capturing || !!error,
-          className: "flex-1 py-3.5 px-6 rounded-2xl bg-gradient-to-r from-cyan-500 via-sky-500 to-indigo-600 hover:opacity-95 text-white text-sm font-extrabold shadow-[0_0_25px_rgba(6,182,212,0.4)] flex items-center justify-center gap-2 border border-cyan-300/40 uppercase tracking-wider disabled:opacity-50 transition-all"
-        }, h(Icon, { name: "Camera", size: 18 }), capturing ? "Processing 4K Capture…" : "Capture & Verify"),
-        h("div", { className: "w-12 text-center text-[10px] text-cyan-400 font-mono font-bold" }, "4K HDR")
+      h("div", { className: "flex gap-2 mt-4" },
+        h("button", { onClick: onClose, className: "flex-1 rounded-xl py-3 bg-slate-100 text-slate-700 text-sm font-semibold hover:bg-slate-200" }, "Cancel"),
+        h("button", { onClick: handleCapture, disabled: capturing || !!error, className: "flex-1 rounded-xl py-3 accent-grad text-white text-sm font-semibold inline-flex items-center justify-center gap-2 disabled:opacity-50 accent-glow" },
+          h(Icon, { name: "Camera", size: 16 }), capturing ? "Capturing..." : "Capture & Verify"
+        )
       )
     )
   );
@@ -3457,6 +3415,7 @@ function ExtractedCredentialsCard({ fields, result }) {
       h("div", { className: "p-3 rounded-xl bg-white/5 border border-white/5 flex flex-col justify-between" },
         h("span", { className: "text-[11px] text-slate-400" }, "Subject Full Name"),
         h("span", { className: "font-bold text-[#0B1220] mt-1 text-sm whitespace-normal break-words" }, fields.name),
+        fields.fatherName && h("span", { className: "text-[10px] text-slate-400 truncate" }, "Father / Guardian: ", fields.fatherName),
         h("span", { className: "text-[10px] text-emerald-600 font-semibold mt-1 flex items-center gap-1" },
           h("i", null, "✓"), " Identity Match Authenticated"
         )
@@ -3527,6 +3486,23 @@ function randomChallenges() {
   return [...LIVENESS_CHALLENGES].sort(() => Math.random() - 0.5).slice(0, 3);
 }
 let blazefaceModelPromise = null;
+async function getBlazeFaceModel() {
+  if (!blazefaceModelPromise) {
+    blazefaceModelPromise = (async () => {
+      try {
+        if (window.zyEnsure) await window.zyEnsure("blazeface");
+        if (window.blazeface && window.blazeface.load) {
+          return await window.blazeface.load();
+        }
+      } catch (e) {
+        console.warn("[Garaa] BlazeFace fallback to government layout", e);
+      }
+      return null;
+    })();
+  }
+  return blazefaceModelPromise;
+}
+
 function normalizeDetectedFace(face) {
   if (face && face.boundingBox) {
     return { x: face.boundingBox.x, y: face.boundingBox.y, width: face.boundingBox.width, height: face.boundingBox.height };
@@ -3541,6 +3517,7 @@ function normalizeDetectedFace(face) {
   }
   return null;
 }
+
 function locateFaceRegion(image, documentTypeId = "aadhaar") {
   const W = image.naturalWidth || image.width || 800;
   const H = image.naturalHeight || image.height || 600;
@@ -3555,13 +3532,41 @@ function locateFaceRegion(image, documentTypeId = "aadhaar") {
   const data = ctx.getImageData(0, 0, dw, dh).data;
 
   const doc = (documentTypeId || "").toLowerCase();
+  const isAadhaar = doc.includes("aadhaar") || doc.includes("aadhar") || doc === "id";
   const isPan = doc.includes("pan");
-  const isEdu = doc.includes("edu") || doc.includes("cert") || doc.includes("degree");
+  const isPassport = doc.includes("passport");
+  const isDL = doc.includes("driving") || doc.includes("dl") || doc.includes("licence") || doc.includes("license");
+  const isVoter = doc.includes("voter") || doc.includes("epic");
+  const isEdu = doc.includes("edu") || doc.includes("cert") || doc.includes("degree") || doc.includes("marksheet");
 
+  // Official Government Document Layout Specifications:
+  // 1. Aadhaar Card: Official photo on LEFT (x: 0.04 to 0.36, y: 0.18 to 0.68)
+  // 2. PAN Card: Official photo on LEFT (x: 0.04 to 0.32, y: 0.22 to 0.65)
+  // 3. Voter ID (EPIC): Official photo on LEFT (x: 0.04 to 0.35, y: 0.20 to 0.70)
+  // 4. Indian Passport: Official photo on RIGHT (x: 0.64 to 0.96, y: 0.16 to 0.68)
+  // 5. Driving Licence (Smart Card): Official photo on RIGHT (x: 0.65 to 0.96, y: 0.18 to 0.68)
+  // 6. Educational Certificate: Official photo on TOP-RIGHT (x: 0.68 to 0.94, y: 0.05 to 0.38)
   const candidates = [
-    { name: "right",   x: 0.58, y: 0.14, w: 0.38, h: 0.65, priority: isPan ? 1.0 : (isEdu ? 1.5 : 3.5) },
-    { name: "left",    x: 0.04, y: 0.16, w: 0.38, h: 0.65, priority: isPan ? 3.5 : 1.2 },
-    { name: "cert_tr", x: 0.68, y: 0.05, w: 0.28, h: 0.45, priority: isEdu ? 4.0 : 0.8 }
+    {
+      name: "left_gov",
+      x: 0.04, y: 0.18, w: 0.34, h: 0.54,
+      priority: (isAadhaar || isPan || isVoter) ? 4.8 : (isPassport ? 0.3 : 1.2)
+    },
+    {
+      name: "right_gov",
+      x: 0.64, y: 0.16, w: 0.32, h: 0.54,
+      priority: (isPassport || isDL) ? 4.8 : (isAadhaar || isPan ? 0.3 : 1.5)
+    },
+    {
+      name: "cert_tr",
+      x: 0.68, y: 0.05, w: 0.28, h: 0.40,
+      priority: isEdu ? 5.0 : 0.4
+    },
+    {
+      name: "left_square",
+      x: 0.04, y: 0.22, w: 0.32, h: 0.48,
+      priority: (isAadhaar || isPan || isVoter) ? 4.2 : 1.0
+    }
   ];
 
   let bestZone = candidates[0];
@@ -3597,7 +3602,7 @@ function locateFaceRegion(image, documentTypeId = "aadhaar") {
 
     const skinDensity = totalSamples > 0 ? (skinCount / totalSamples) : 0;
     const detailDensity = totalSamples > 0 ? (detailSum / totalSamples) : 0;
-    const score = (skinDensity * 4.0) + (Math.min(30, detailDensity) * 0.12) + (cand.priority * 0.5);
+    const score = (skinDensity * 4.5) + (Math.min(30, detailDensity) * 0.12) + (cand.priority * 0.9);
 
     if (score > bestScore) {
       bestScore = score;
@@ -3605,15 +3610,51 @@ function locateFaceRegion(image, documentTypeId = "aadhaar") {
     }
   }
 
+  // Refine center of mass of detected face pixels in the winning zone
+  let sumX = 0, sumY = 0, facePixelCount = 0;
+  const zx = Math.floor(bestZone.x * dw), zy = Math.floor(bestZone.y * dh);
+  const zw = Math.floor(bestZone.w * dw), zh = Math.floor(bestZone.h * dh);
+  for (let py = zy; py < zy + zh; py += 2) {
+    for (let px = zx; px < zx + zw; px += 2) {
+      const idx = (py * dw + px) * 4;
+      const r = data[idx], g = data[idx + 1], b = data[idx + 2];
+      const Y = 0.299 * r + 0.587 * g + 0.114 * b;
+      const Cb = 128 - 0.169 * r - 0.331 * g + 0.5 * b;
+      const Cr = 128 + 0.5 * r - 0.419 * g - 0.081 * b;
+      if (Y > 35 && Cb > 75 && Cb < 135 && Cr > 125 && Cr < 178) {
+        sumX += px; sumY += py; facePixelCount++;
+      }
+    }
+  }
+
+  let finalX = bestZone.x * W;
+  let finalY = bestZone.y * H;
+  const cropW = bestZone.w * W;
+  const cropH = bestZone.h * H;
+
+  if (facePixelCount > 30) {
+    const cx = (sumX / facePixelCount) / dw * W;
+    const cy = (sumY / facePixelCount) / dh * H;
+    finalX = Math.max(0, Math.min(W - cropW, cx - cropW / 2));
+    finalY = Math.max(0, Math.min(H - cropH, cy - cropH * 0.45));
+  }
+
   return {
-    x: Math.round(bestZone.x * W),
-    y: Math.round(bestZone.y * H),
-    width: Math.round(bestZone.w * W),
-    height: Math.round(bestZone.h * H)
+    x: Math.round(finalX),
+    y: Math.round(finalY),
+    width: Math.round(cropW),
+    height: Math.round(cropH)
   };
 }
 
 async function detectFaceBoxes(source) {
+  try {
+    const model = await getBlazeFaceModel();
+    if (model && model.estimateFaces) {
+      const faces = await model.estimateFaces(source, false);
+      if (faces && faces.length) return faces.map(normalizeDetectedFace).filter(Boolean);
+    }
+  } catch (err) {}
   if (typeof window.FaceDetector === "function") {
     try {
       const detector = new window.FaceDetector({ fastMode: true, maxDetectedFaces: 3 });
@@ -3625,6 +3666,13 @@ async function detectFaceBoxes(source) {
 }
 
 async function detectDocumentFaces(image) {
+  try {
+    const model = await getBlazeFaceModel();
+    if (model && model.estimateFaces) {
+      const faces = await model.estimateFaces(image, false);
+      if (faces && faces.length) return faces.map(normalizeDetectedFace).filter(Boolean);
+    }
+  } catch (err) {}
   if (typeof window.FaceDetector === "function") {
     try {
       const detector = new window.FaceDetector({ fastMode: true, maxDetectedFaces: 3 });
@@ -3636,6 +3684,10 @@ async function detectDocumentFaces(image) {
 }
 
 async function detectFaceCount(source) {
+  try {
+    const faces = await detectFaceBoxes(source);
+    if (faces && faces.length) return faces.length;
+  } catch (e) {}
   return 1;
 }
 
@@ -3644,6 +3696,10 @@ async function detectFaceFromUrl(url) {
   const image = new Image();
   await new Promise((resolve) => { image.onload = resolve; image.onerror = resolve; image.src = url; });
   if (!image.naturalWidth) return null;
+  try {
+    const faces = await detectDocumentFaces(image);
+    if (faces && faces.length > 0) return faces.length;
+  } catch (e) {}
   return 1;
 }
 
@@ -3654,24 +3710,24 @@ async function extractDocumentPhoto(sourceUrl, documentTypeId = "aadhaar") {
   if (!image.naturalWidth || !image.naturalHeight) return sourceUrl;
 
   let crop = null;
-  if (typeof window.FaceDetector === "function") {
-    try {
-      const detector = new window.FaceDetector({ fastMode: true, maxDetectedFaces: 2 });
-      const faces = await detector.detect(image);
-      if (faces && faces.length) {
-        const b = faces.sort((a, b) => (b.boundingBox.width * b.boundingBox.height) - (a.boundingBox.width * a.boundingBox.height))[0].boundingBox;
-        const pw = b.width * 1.8;
-        const ph = b.height * 2.2;
-        crop = {
-          x: Math.max(0, b.x + b.width / 2 - pw / 2),
-          y: Math.max(0, b.y + b.height * 0.2 - ph * 0.25),
-          width: Math.min(pw, image.naturalWidth),
-          height: Math.min(ph, image.naturalHeight)
-        };
-      }
-    } catch (e) {}
-  }
 
+  // 1. Try neural face detection (BlazeFace model or native browser FaceDetector)
+  try {
+    const faces = await detectDocumentFaces(image);
+    if (faces && faces.length) {
+      const b = faces.sort((a, b) => (b.width * b.height) - (a.width * a.height))[0];
+      const pw = b.width * 1.8;
+      const ph = b.height * 2.2;
+      crop = {
+        x: Math.max(0, b.x + b.width / 2 - pw / 2),
+        y: Math.max(0, b.y + b.height * 0.25 - ph * 0.28),
+        width: Math.min(pw, image.naturalWidth),
+        height: Math.min(ph, image.naturalHeight)
+      };
+    }
+  } catch (e) {}
+
+  // 2. Official Government Layout Coordinates + Skin-tone Centroid Analysis
   if (!crop) {
     crop = locateFaceRegion(image, documentTypeId);
   }
